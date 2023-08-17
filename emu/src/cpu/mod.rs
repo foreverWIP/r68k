@@ -217,7 +217,7 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
     }
     fn cond_eq(&self) -> bool {
         // equal
-        (self.not_z_flag == ZFLAG_SET)
+        self.not_z_flag == ZFLAG_SET
     }
     fn cond_ne(&self) -> bool {
         // not equal
@@ -225,7 +225,7 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
     }
     fn cond_vc(&self) -> bool {
         // overflow clear
-        (self.v_flag & VFLAG_SET == 0)
+        self.v_flag & VFLAG_SET == 0
     }
     fn cond_vs(&self) -> bool {
         // overflow set
@@ -233,7 +233,7 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
     }
     fn cond_pl(&self) -> bool {
         // plus
-        (self.n_flag & NFLAG_SET == 0)
+        self.n_flag & NFLAG_SET == 0
     }
     fn cond_mi(&self) -> bool {
         // minus
@@ -416,7 +416,7 @@ impl error::Error for Exception {
             Exception::Interrupt(_, _) => "Interrupt",
          }
     }
-    fn cause(&self) -> Option<&error::Error> {
+    fn cause(&self) -> Option<&dyn error::Error> {
         None
     }
 }
@@ -603,7 +603,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         self.prefetch_if_needed();
         let prev_prefetch_data = self.prefetch_data;
         Ok(if self.prefetch_if_needed() {
-            ((prev_prefetch_data << 16) | (self.prefetch_data >> 16))
+            (prev_prefetch_data << 16) | (self.prefetch_data >> 16)
         } else {
             prev_prefetch_data
         })
@@ -931,7 +931,7 @@ mod tests {
     use ram::{AddressBus, SUPERVISOR_PROGRAM, USER_PROGRAM, USER_DATA};
     use ram::loggingmem::Operation;
     use cpu::ops::opcodes;
-    use r68k_common::constants;
+    
 
     #[test]
     fn new_sets_pc() {

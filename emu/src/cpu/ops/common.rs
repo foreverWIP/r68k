@@ -1393,7 +1393,7 @@ mod tests {
     }
     #[test]
     fn dx_and_dy() {
-        let core: &mut Core = &mut core_with_ir(0b1111_1001_1111_1010);
+        let core: &mut dyn Core = &mut core_with_ir(0b1111_1001_1111_1010);
 
         assert_eq!(0b1111_1001_1111_1010, ir!(core)); // X=4, Y=2
         assert_eq!(0x22, dy!(core));
@@ -1401,14 +1401,14 @@ mod tests {
     }
     #[test]
     fn more_dx_and_dy() {
-        let core: &mut Core = &mut core_with_ir(0b1111_1011_1111_1110);
+        let core: &mut dyn Core = &mut core_with_ir(0b1111_1011_1111_1110);
         assert_eq!(0b1111_1011_1111_1110, ir!(core)); // X=5, Y=6
         assert_eq!(0x66, dy!(core));
         assert_eq!(0x55, dx!(core));
     }
     #[test]
     fn ax_and_ay() {
-        let core: &mut Core = &mut core_with_ir(0b1111_1001_1111_1010);
+        let core: &mut dyn Core = &mut core_with_ir(0b1111_1001_1111_1010);
 
         assert_eq!(0b1111_1001_1111_1010, ir!(core)); // X=4, Y=2
         assert_eq!(0xAA, ay!(core));
@@ -1416,7 +1416,7 @@ mod tests {
     }
     #[test]
     fn more_ax_and_ay() {
-        let core: &mut Core = &mut core_with_ir(0b1111_1011_1111_1110);
+        let core: &mut dyn Core = &mut core_with_ir(0b1111_1011_1111_1110);
 
         assert_eq!(0b1111_1011_1111_1110, ir!(core)); // X=5, Y=6
         assert_eq!(0xEE, ay!(core));

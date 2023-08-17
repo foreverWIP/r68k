@@ -1898,7 +1898,7 @@ fn generate_optable<T: Core>() -> Vec<OpcodeHandler<T>> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    
     use cpu::TestCore;
     
     #[test]

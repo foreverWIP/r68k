@@ -126,14 +126,14 @@ fn postincrement_32<T: Core>(core: &mut T, reg_ndx: usize) -> u32 {
     ea
 }
 pub fn displacement<T: Core>(core: &mut T, reg_val: u32) -> Result<u32> {
-    let displacement = try!(core.read_imm_i16());
+    let displacement = core.read_imm_i16()?;
     let ea = (Wrapping(reg_val) + Wrapping(displacement as u32)).0;
     Ok(ea)
 }
 // Brief Extension Word format (see M68000 PRM section 2.1)
 const LONG_INDEX_MASK: u16 = 0x0800;
 fn index<T: Core>(core: &mut T, reg_val: u32) -> Result<u32> {
-    let extension = try!(core.read_imm_u16());
+    let extension = core.read_imm_u16()?;
     // top four bits = (D/A RRR) matches our register array layout
     let xreg_ndx = (extension>>12) as usize;
     let xn = dar!(core)[xreg_ndx];
