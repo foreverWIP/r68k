@@ -277,7 +277,6 @@ pub fn initialize_musashi(core: &mut TestCore, memory_initializer: u32) {
         // resetting of state. But we don't want to test those ops.
         MUSASHI_OPCOUNT = 0;
         //m68k_set_reg(Register::PC, core.pc);
-        m68k_set_reg(Register::USP, core.usp());
         // if SR clears S_FLAG then SSP <- A7, A7 <- USP
         m68k_set_reg(Register::SR, core.status_register() as u32);
         for (i, &reg) in REGS.iter().enumerate() {
@@ -285,6 +284,8 @@ pub fn initialize_musashi(core: &mut TestCore, memory_initializer: u32) {
                 m68k_set_reg(reg, core.dar[i]);
             }
         }
+        m68k_set_reg(Register::USP, core.usp());
+        m68k_set_reg(Register::ISP, core.ssp());
         // just copy diffs, as it takes too long to reset all 16MB
         for (addr, byte) in core.mem.diffs() {
             write_musashi_byte(addr, byte);
@@ -359,15 +360,17 @@ mod tests {
     use ram::loggingmem::Operation;
     use cpu::{TestCore, EXCEPTION_ZERO_DIVIDE, EXCEPTION_CHK, Cycles};
     use std::cmp;
+    use musashi::tests::rand::Rng;
 
     extern crate quickcheck;
     use self::quickcheck::*;
     #[derive(Copy, Clone, Debug, PartialEq)]
     struct Bitpattern(u32);
     impl Arbitrary for Bitpattern {
-        fn arbitrary<G: Gen>(g: &mut G) -> Bitpattern {
+        fn arbitrary(g: &mut Gen) -> Bitpattern {
+            let mut rng = rand::thread_rng();
             // when size 256, could generate any 32 bit pattern
-            let nonuniform: u32 = g.gen_range(0, 256);
+            let nonuniform: u32 = rng.gen_range(0..256); // g.gen_range(0, 256);
             // increase likelihood of returning all zeros to 1:32
             if nonuniform < 8 {return Bitpattern(0)}
             // increase likelihood of returning all ones to 1:32
@@ -392,7 +395,7 @@ mod tests {
     }
 
     impl Arbitrary for Register {
-        fn arbitrary<G: Gen>(g: &mut G) -> Register {
+        fn arbitrary(g: &mut Gen) -> Register {
             let regs = [Register::D0, Register::D1, Register::D2, Register::D3, Register::D4, Register::D5, Register::D6, Register::D7, Register::A0, Register::A1, Register::A2, Register::A3, Register::A4, Register::A5, Register::A6,
             Register::SR, // Register::A7, Register::SP, Register::PC
             ];
@@ -598,7 +601,7 @@ mod tests {
                     OPCODE_UNDER_TEST = opcode;
                 }
                 QuickCheck::new()
-                .gen(StdGen::new(rand::thread_rng(), 256))
+                .gen(Gen::new(256))
                 .tests(qc_rounds)
                 .quickcheck($hammer as fn(_, _) -> _);
             }
