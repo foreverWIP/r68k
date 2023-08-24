@@ -422,6 +422,8 @@ impl error::Error for Exception {
 }
 use std::num::Wrapping;
 
+use crate::ram::ADDRBUS_MASK;
+
 // these values are borrowed from Musashi
 // and not yet fully understood
 const SFLAG_SET: u32 =  0x04;
@@ -596,29 +598,55 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         fetched
     }
     pub fn read_imm_u32(&mut self) -> Result<u32> {
+        let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if self.pc & 1 > 0 {
-            let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
             return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
-        self.prefetch_if_needed();
+        /*self.prefetch_if_needed();
         let prev_prefetch_data = self.prefetch_data;
         Ok(if self.prefetch_if_needed() {
             (prev_prefetch_data << 16) | (self.prefetch_data >> 16)
         } else {
             prev_prefetch_data
-        })
+        })*/
+        let mut temp_val = 0u32;
+        if self.pc != self.prefetch_addr {
+            self.prefetch_addr = self.pc;
+            self.prefetch_data = self.mem.read_word(address_space, self.prefetch_addr & ADDRBUS_MASK);
+        }
+        temp_val = self.prefetch_data & 0xffff;
+        self.pc += 2;
+        self.prefetch_addr = self.pc;
+        self.prefetch_data = self.mem.read_word(address_space, self.prefetch_addr & ADDRBUS_MASK);
+
+        temp_val = (temp_val << 16) | (self.prefetch_data & 0xffff);
+        self.pc += 2;
+        self.prefetch_addr = self.pc;
+        self.prefetch_data = self.mem.read_word(address_space, self.prefetch_addr & ADDRBUS_MASK);
+
+        Ok(temp_val)
     }
     pub fn read_imm_i16(&mut self) -> Result<i16> {
         self.read_imm_u16().map(|val| val as i16)
     }
     pub fn read_imm_u16(&mut self) -> Result<u16> {
         // the Musashi read_imm_16 calls cpu_read_long as part of prefetch
+        let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if self.pc & 1 > 0 {
-            let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
             return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
-        self.prefetch_if_needed();
-        Ok(((self.prefetch_data >> ((2 - ((self.pc.wrapping_sub(2)) & 2))<<3)) & 0xffff) as u16)
+        // self.prefetch_if_needed();
+        // Ok(((self.prefetch_data >> ((2 - ((self.pc.wrapping_sub(2)) & 2))<<3)) & 0xffff) as u16)
+        let mut result = 0u32;
+        if self.pc != self.prefetch_addr {
+            self.prefetch_addr = self.pc;
+            self.prefetch_data = self.mem.read_word(address_space, self.prefetch_addr & ADDRBUS_MASK);
+        }
+        result = self.prefetch_data & 0xffff;
+        self.pc += 2;
+        self.prefetch_addr = self.pc;
+        self.prefetch_data = self.mem.read_word(address_space, self.prefetch_addr & ADDRBUS_MASK);
+        Ok(result as u16)
     }
     pub fn push_sp(&mut self) -> u32 {
          let new_sp = (Wrapping(self.dar[15]) - Wrapping(4)).0;

@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 #![recursion_limit = "160"] // 150 was too low in rust 1.15
 use std::result;
 mod operand;
@@ -20,8 +21,8 @@ use memory::Memory;
 // type alias for exception handling
 pub type Result<T> = result::Result<T, Exception>;
 type OpcodeValidator = fn(u16) -> bool;
-type OperandDecoder = fn(u16, Size, PC, &Memory) -> (Words, Vec<Operand>);
-type InstructionEncoder = fn(&OpcodeInstance, u16, PC, &mut Memory) -> PC;
+type OperandDecoder = fn(u16, Size, PC, &dyn Memory) -> (Words, Vec<Operand>);
+type InstructionEncoder = fn(&OpcodeInstance, u16, PC, &mut dyn Memory) -> PC;
 type InstructionSelector = fn(&OpcodeInstance) -> bool;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct PC(pub u32);
@@ -499,7 +500,7 @@ fn generate<'a>() -> Vec<OpcodeInfo<'a>> {
 mod tests {
     use memory::{MemoryVec, Memory};
     use assembler::Assembler;
-    use disassembler::{Disassembler, disassemble, disassemble_first};
+    use disassembler::{Disassembler, disassemble_first};
     use super::Exception;
     use PC;
 
@@ -508,7 +509,7 @@ mod tests {
         let opcode = 0xd511;
         let mem = &mut MemoryVec::new16(PC(0), vec![opcode]);
         let asm = {
-            let (pc, inst) = disassemble_first(mem);
+            let (_, inst) = disassemble_first(mem);
             format!(" {}", inst)
         };
         let pc = PC(0);
@@ -526,7 +527,7 @@ mod tests {
         let a = Assembler::new();
         let inst = a.parse_assembler(asm);
         a.encode_instruction(asm, &inst, pc, mem);
-        let (pc, inst) = disassemble_first(mem);
+        let (_, inst) = disassemble_first(mem);
 
         assert_eq!(asm, format!(" {}", inst));
     }
@@ -606,7 +607,7 @@ mod tests {
                     let unsized_inst = a.parse_assembler(asm_text.as_str());
                     // println!("PREADJ {:04x} disassembled as{}\n\t{:?}, parsed as\n\t{:?}", opcode, asm_text, dis_inst, unsized_inst);
                     let sized_inst = a.adjust_size(&unsized_inst);
-                    let mut asm_mem = &mut MemoryVec::new();
+                    let asm_mem = &mut MemoryVec::new();
                     // println!("PREENC {:04x} disassembled as{}\n\t{:?}, parsed as\n\t{:?}, sized to\n\t{:?}", opcode, asm_text, dis_inst, unsized_inst, sized_inst);
                     let asm_pc = a.encode_instruction(asm_text.as_str(), &sized_inst, pc, asm_mem);
                     let new_opcode = asm_mem.read_word(pc);

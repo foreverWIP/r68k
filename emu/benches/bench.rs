@@ -27,16 +27,16 @@ fn bench_100k_cycles(b: &mut Bencher) {
     let pc_base = 0x1000;
     // write an instruction sequence of simple reg-to-reg operations
     for i in 0..0x10000 {
-        cpu.write_program_word(pc_base + i*2, regregops[(i % regregops.len() as u32) as usize]).unwrap();
+        cpu.write_word(pc_base + i*2, regregops[(i % regregops.len() as u32) as usize]).unwrap();
     }
-    cpu.write_program_long(0, 0x100000).unwrap(); // SSP
-    cpu.write_program_long(4, pc_base).unwrap(); // PC
+    cpu.write_long(0, 0x100000).unwrap(); // SSP
+    cpu.write_long(4, pc_base).unwrap(); // PC
 
     let generic_handler = 0x900;
     for exception in 2..256 {
-        cpu.write_data_long(exception * 4, generic_handler).unwrap(); // set up exception vector
+        cpu.write_long(exception * 4, generic_handler).unwrap(); // set up exception vector
     }
-    cpu.write_data_word(generic_handler, opcodes::OP_RTE_32).unwrap(); // handler is just RTE
+    cpu.write_word(generic_handler, opcodes::OP_RTE_32).unwrap(); // handler is just RTE
     let cycles_per_instruction = 4;
     let num_instructions = 25_000;
     let bytes_per_instruction = 2;

@@ -16,10 +16,8 @@ mod tests {
     use cpu::TestCore;
     use r68k_tools::memory::MemoryVec;
     use r68k_tools::PC;
-    use r68k_tools::disassembler::disassemble;
     use r68k_tools::Exception;
     use cpu::ops::handlers::InstructionSetGenerator;
-    use cpu::ops::handlers::OpcodeHandler;
     use r68k_tools::disassembler::Disassembler;
 
     #[test]
@@ -35,7 +33,7 @@ mod tests {
             let op = optable[opcode];
             let parts:Vec<&str> = op.split('_').collect();
             let mnemonic = parts[0];
-            let mut pc = PC(0);
+            let pc = PC(0);
             let extension_word_mask = 0b1111_1000_1111_1111;
             // bits 8-10 should always be zero in the ea extension word
             // as we don't know which word will be seen as the ea extension word
@@ -48,7 +46,7 @@ mod tests {
                     println!("{:04x}: {} disasm under", opcode, op);
                 }
                 , //println!("{:04x}:\t\tover", opcode),
-                Ok((new_pc, dis_inst)) => if op == "???" || op == "unimplemented_1111" || op == "unimplemented_1010" || op == "illegal" {
+                Ok((_, dis_inst)) => if op == "???" || op == "unimplemented_1111" || op == "unimplemented_1010" || op == "illegal" {
                     over += 1;
                     println!("{:04x}: {} disasm over, {}", opcode, op, dis_inst);
                 } else if dis_inst.mnemonic.to_lowercase() != mnemonic && mnemonic != "real" { // ILLEGAL == real_illegal

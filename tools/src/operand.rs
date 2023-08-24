@@ -30,7 +30,7 @@ fn encode_extension_word(xreg_ndx_size: u8, displacement: i8) -> u16 {
 }
 
 impl Operand {
-    pub fn add_extension_words(&self, pc: PC, mem: &mut Memory) -> PC {
+    pub fn add_extension_words(&self, pc: PC, mem: &mut dyn Memory) -> PC {
         match *self {
             Operand::DataRegisterDirect(_) => pc,
             Operand::AddressRegisterDirect(_) => pc,
@@ -71,7 +71,7 @@ fn bit_reverse(x: u16) -> u16 {
     let x = (x & 0b1010_1010_1010_1010) >> 1 | (x & 0b0101_0101_0101_0101) << 1;
     let x = (x & 0b1100_1100_1100_1100) >> 2 | (x & 0b0011_0011_0011_0011) << 2;
     let x = (x & 0b1111_0000_1111_0000) >> 4 | (x & 0b0000_1111_0000_1111) << 4;
-    (x >> 8 | x << 8)
+    x >> 8 | x << 8
 }
 
 impl fmt::Display for Operand {
@@ -85,7 +85,7 @@ impl fmt::Display for Operand {
                     let mut span = bit;
                     let span = loop {
                         if span < 16 {
-                            let spanbit = (1 << span);
+                            let spanbit = 1 << span;
                             if spanbit & reglist != 0 {
                                 reglist &= !spanbit;
                                 span += 1;
@@ -119,7 +119,7 @@ impl fmt::Display for Operand {
                 }
             };
             result
-        };
+        }
         match *self {
             Operand::DataRegisterDirect(reg) => write!(f, "D{}", reg),
             Operand::AddressRegisterDirect(reg) => write!(f, "A{}", reg),

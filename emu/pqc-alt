@@ -1,0 +1,12 @@
+# ensure code is compiled once, before parallelizing
+echo Compiling and running standard tests...
+# OPS=$(cargo test -- --list 2> /dev/null | grep "musashi::tests::qc" | sed 's/: test//' | sed 's/musashi::tests:://')
+results=target/debug/qc-results
+rm -rf $results
+mkdir -p $results
+OPS=$(cargo test -- --list 2> /dev/null | sed 's/: test//' | grep "musashi::tests::qc")
+cargo test --no-run
+if [ ${PIPESTATUS[0]} -eq 0 ]; then
+RUST_BACKTRACE=1 parallel cargo test {} "2>" /dev/null "1>" $results/{}.log ::: $OPS
+fi
+# ./find-errs

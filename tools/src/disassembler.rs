@@ -142,7 +142,7 @@ pub fn decode_ay_imm16(opcode: u16, _size: Size, pc: PC, mem: &dyn Memory) -> (W
 
     (words, vec![ay, imm])
 }
-pub fn decode_just_ay(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_just_ay(opcode: u16, _size: Size, _pc: PC, _mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let ay = decode_ay(opcode);
     (Words(0), vec![ay])
 }
@@ -158,10 +158,10 @@ pub fn decode_dx_diy(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Word
     let (words, di) = decode_diy(opcode, size, pc, mem);
     (words, vec![decode_dx(opcode), di])
 }
-pub fn decode_moveq(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_moveq(opcode: u16, _size: Size, _pc: PC, _mem: &dyn Memory) -> (Words, Vec<Operand>) {
     (Words(0), vec![Operand::Number(Size::Byte, (opcode & 0xff) as i32), decode_dx(opcode)])
 }
-pub fn decode_none(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_none(_opcode: u16, _size: Size, _pc: PC, _mem: &dyn Memory) -> (Words, Vec<Operand>) {
     (Words(0), vec![])
 }
 pub fn decode_just_ea(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
@@ -181,12 +181,12 @@ pub fn decode_dx_ea(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words
     let (words, ea) = decode_ea(opcode, size, pc, mem);
     (words, vec![decode_dx(opcode), ea])
 }
-pub fn decode_pdx_pdy(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_pdx_pdy(opcode: u16, _size: Size, _pc: PC, _mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let pdx = decode_pdx(opcode);
     let pdy = decode_pdy(opcode);
     (Words(0), vec![pdx, pdy])
 }
-pub fn decode_pix_piy(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_pix_piy(opcode: u16, _size: Size, _pc: PC, _mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let pix = decode_pix(opcode);
     let piy = decode_piy(opcode);
     (Words(0), vec![pix, piy])
@@ -197,17 +197,17 @@ pub fn decode_imm_ea(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Word
     let (words2, ea) = decode_ea(opcode, size, pc + words, mem);
     (words + words2, vec![imm, ea])
 }
-pub fn decode_dy_branch(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_dy_branch(opcode: u16, _size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let new_pc: PC = pc + 2;
     let branch = Operand::Branch(Size::Word, (new_pc + mem.read_word(new_pc) as i16 as i32).0);
     (Words(1), vec![decode_dy(opcode), branch])
 }
 
-pub fn decode_imm8_dy(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_imm8_dy(opcode: u16, _size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let (words, imm) = decode_imm(Size::Byte, pc, mem);
     (words, vec![imm, decode_dy(opcode)])
 }
-pub fn decode_just_imm16(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_just_imm16(_opcode: u16, _size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let (words, imm) = decode_imm(Size::Word, pc, mem);
     (words, vec![imm])
 }
@@ -216,30 +216,30 @@ pub fn decode_quick_ea(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Wo
     let (words, ea) = decode_ea(opcode, size, pc, mem);
     (words, vec![quick, ea])
 }
-pub fn decode_quick_dy(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_quick_dy(opcode: u16, _size: Size, _pc: PC, _mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let quick = decode_quick(opcode);
     let dy = decode_dy(opcode);
     (Words(0), vec![quick, dy])
 }
-pub fn decode_just_dy(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_just_dy(opcode: u16, _size: Size, _pc: PC, _mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let dy = decode_dy(opcode);
     (Words(0), vec![dy])
 }
-pub fn decode_just_imm4(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_just_imm4(opcode: u16, _size: Size, _pc: PC, _mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let imm4 = decode_imm4(opcode);
     (Words(0), vec![imm4])
 }
-pub fn decode_dx_dy(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_dx_dy(opcode: u16, _size: Size, _pc: PC, _mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let dx = decode_dx(opcode);
     let dy = decode_dy(opcode);
     (Words(0), vec![dx, dy])
 }
-pub fn decode_dx_ay(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_dx_ay(opcode: u16, _size: Size, _pc: PC, _mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let dx = decode_dx(opcode);
     let ay = decode_ay(opcode);
     (Words(0), vec![dx, ay])
 }
-pub fn decode_ax_ay(opcode: u16, size: Size, pc: PC, mem: &dyn Memory) -> (Words, Vec<Operand>) {
+pub fn decode_ax_ay(opcode: u16, _size: Size, _pc: PC, _mem: &dyn Memory) -> (Words, Vec<Operand>) {
     let ax = decode_ax(opcode);
     let ay = decode_ay(opcode);
     (Words(0), vec![ax, ay])
@@ -285,13 +285,13 @@ pub fn valid_ea(opcode: u16, ea_mask: u16) -> bool
     } else {
         // ea is the lower six bits of the opcode
         match opcode & 0x3f {
-            0x00 ... 0x07 => (ea_mask & EA_DATA_REGISTER_DIRECT) != 0,
-            0x08 ... 0x0f => (ea_mask & EA_ADDRESS_REGISTER_DIRECT) != 0,
-            0x10 ... 0x17 => (ea_mask & EA_ADDRESS_REGISTER_INDIRECT) != 0,
-            0x18 ... 0x1f => (ea_mask & EA_ARI_POSTINCREMENT) != 0,
-            0x20 ... 0x27 => (ea_mask & EA_ARI_PREDECREMENT) != 0,
-            0x28 ... 0x2f => (ea_mask & EA_ARI_DISPLACEMENT) != 0,
-            0x30 ... 0x37 => (ea_mask & EA_ARI_INDEX) != 0,
+            0x00 ..= 0x07 => (ea_mask & EA_DATA_REGISTER_DIRECT) != 0,
+            0x08 ..= 0x0f => (ea_mask & EA_ADDRESS_REGISTER_DIRECT) != 0,
+            0x10 ..= 0x17 => (ea_mask & EA_ADDRESS_REGISTER_INDIRECT) != 0,
+            0x18 ..= 0x1f => (ea_mask & EA_ARI_POSTINCREMENT) != 0,
+            0x20 ..= 0x27 => (ea_mask & EA_ARI_PREDECREMENT) != 0,
+            0x28 ..= 0x2f => (ea_mask & EA_ARI_DISPLACEMENT) != 0,
+            0x30 ..= 0x37 => (ea_mask & EA_ARI_INDEX) != 0,
             0x38 => (ea_mask & EA_ABSOLUTE_SHORT) != 0,
             0x39 => (ea_mask & EA_ABSOLUTE_LONG) != 0,
             0x3a => (ea_mask & EA_PC_DISPLACEMENT) != 0,

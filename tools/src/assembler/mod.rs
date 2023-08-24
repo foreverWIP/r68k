@@ -100,7 +100,7 @@ fn assert_no_overlap(op: &OpcodeInstance, template: u16, ea: u16, xreg: u16) {
     assert!(template & ea | template & xreg | ea & xreg == 0, "\ntemplate {:016b}\nea       {:16b}\nxreg     {:16b}\noverlaps for {}", template, ea, xreg, op);
 }
 
-pub fn encode_ea_dx(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_ea_dx(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let ea = encode_ea(&op.operands[0]);
     let dx = encode_dx(&op.operands[1]);
     assert_no_overlap(&op, template, ea, dx);
@@ -108,7 +108,7 @@ pub fn encode_ea_dx(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory
     op.operands[0].add_extension_words(pc, mem)
 }
 
-pub fn encode_ea_ax(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_ea_ax(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let ea = encode_ea(&op.operands[0]);
     let ax = encode_ax(&op.operands[1]);
     assert_no_overlap(&op, template, ea, ax);
@@ -116,26 +116,26 @@ pub fn encode_ea_ax(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory
     op.operands[0].add_extension_words(pc, mem)
 }
 
-pub fn encode_dx_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_dx_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let ea = encode_ea(&op.operands[1]);
     let dx = encode_dx(&op.operands[0]);
     assert_no_overlap(&op, template, ea, dx);
     let pc = mem.write_word(pc, template | ea | dx);
     op.operands[1].add_extension_words(pc, mem)
 }
-pub fn encode_dy_branch(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_dy_branch(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let dy = encode_dy(&op.operands[0]);
     assert_no_overlap(&op, template, 0, dy);
     let pc = mem.write_word(pc, template | dy);
     op.operands[1].add_extension_words(pc, mem)
 }
-pub fn encode_imm8_dy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_imm8_dy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let dy = encode_dy(&op.operands[1]);
     assert_no_overlap(&op, template, 0, dy);
     let pc = mem.write_word(pc, template | dy);
     op.operands[0].add_extension_words(pc, mem)
 }
-pub fn encode_just_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_just_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let ea_index = if let Operand::StatusRegister(_) = &op.operands[0] {
         1
     } else {
@@ -146,7 +146,7 @@ pub fn encode_just_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memo
     let pc = mem.write_word(pc, template | ea);
     op.operands[ea_index].add_extension_words(pc, mem)
 }
-pub fn encode_just_imm(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_just_imm(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let result = match op.operands[1] {
         Operand::StatusRegister(_) => true,
         _ => false,
@@ -156,7 +156,7 @@ pub fn encode_just_imm(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Mem
     op.operands[0].add_extension_words(pc, mem)
 }
 
-pub fn encode_just_ay(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_just_ay(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let ea_index = if let Operand::UserStackPointer = &op.operands[0] {
         1
     } else {
@@ -166,18 +166,18 @@ pub fn encode_just_ay(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memo
     assert_no_overlap(&op, template, 0, ay);
     mem.write_word(pc, template | ay)
 }
-pub fn encode_ay_imm16(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_ay_imm16(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let ay = encode_ay(&op.operands[0]);
     assert_no_overlap(&op, template, 0, ay);
     let pc = mem.write_word(pc, template | ay);
     op.operands[1].add_extension_words(pc, mem)
 }
 
-pub fn encode_none(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_none(_op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     mem.write_word(pc, template)
 }
 
-pub fn encode_ea_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_ea_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let src_ea = encode_ea(&op.operands[0]);
     let dst_ea = encode_destination_ea(&op.operands[1]);
     assert_no_overlap(&op, template, src_ea, dst_ea & !template);
@@ -186,79 +186,79 @@ pub fn encode_ea_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory
     op.operands[1].add_extension_words(pc, mem)
 }
 
-pub fn encode_imm_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_imm_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let ea = encode_ea(&op.operands[1]);
     assert_no_overlap(&op, template, ea, 0);
     let pc = mem.write_word(pc, template | ea);
     let pc = op.operands[0].add_extension_words(pc, mem);
     op.operands[1].add_extension_words(pc, mem)
 }
-pub fn encode_just_imm4(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_just_imm4(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let imm = encode_imm4(&op.operands[0]);
     assert_no_overlap(&op, template, 0, imm);
     mem.write_word(pc, template | imm)
 }
-pub fn encode_just_imm16(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_just_imm16(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let pc = mem.write_word(pc, template);
     op.operands[0].add_extension_words(pc, mem)
 }
-pub fn encode_quick_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_quick_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let quick = encode_quick(&op.operands[0]);
     let ea = encode_ea(&op.operands[1]);
     assert_no_overlap(&op, template, ea, quick);
     let pc = mem.write_word(pc, template | ea | quick);
     op.operands[1].add_extension_words(pc, mem)
 }
-pub fn encode_quick_dy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_quick_dy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let quick = encode_quick(&op.operands[0]);
     let dy = encode_dy(&op.operands[1]);
     assert_no_overlap(&op, template, quick, dy);
     mem.write_word(pc, template | dy | quick)
 }
-pub fn encode_just_dy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_just_dy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let dy = encode_dy(&op.operands[0]);
     assert_no_overlap(&op, template, 0, dy);
     mem.write_word(pc, template | dy)
 }
-pub fn encode_dx_dy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_dx_dy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let dx = encode_dx(&op.operands[0]);
     let dy = encode_dy(&op.operands[1]);
     assert_no_overlap(&op, template, dx, dy);
     mem.write_word(pc, template | dx | dy)
 }
-pub fn encode_dx_ay(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_dx_ay(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let dx = encode_dx(&op.operands[0]);
     let ay = encode_ay(&op.operands[1]);
     assert_no_overlap(&op, template, dx, ay);
     mem.write_word(pc, template | dx | ay)
 }
-pub fn encode_ax_ay(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_ax_ay(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let ax = encode_ax(&op.operands[0]);
     let ay = encode_ay(&op.operands[1]);
     assert_no_overlap(&op, template, ax, ay);
     mem.write_word(pc, template | ax | ay)
 }
-pub fn encode_pdx_pdy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_pdx_pdy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let pdx = encode_pdx(&op.operands[0]);
     let pdy = encode_pdy(&op.operands[1]);
     assert_no_overlap(&op, template, pdx, pdy);
     mem.write_word(pc, template | pdx | pdy)
 }
-pub fn encode_diy_dx(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_diy_dx(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let diy = encode_diy(&op.operands[0]);
     let dx = encode_dx(&op.operands[1]);
     assert_no_overlap(&op, template, diy, dx);
     let pc = mem.write_word(pc, template | diy | dx);
     op.operands[0].add_extension_words(pc, mem)
 }
-pub fn encode_dx_diy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_dx_diy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let dx = encode_dx(&op.operands[0]);
     let diy = encode_diy(&op.operands[1]);
     assert_no_overlap(&op, template, diy, dx);
     let pc = mem.write_word(pc, template | diy | dx);
     op.operands[1].add_extension_words(pc, mem)
 }
-pub fn encode_pix_piy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_pix_piy(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let pix = encode_pix(&op.operands[0]);
     let piy = encode_piy(&op.operands[1]);
     assert_no_overlap(&op, template, pix, piy);
@@ -276,13 +276,13 @@ fn encode_8bit_displacement(pc: PC, operand: &Operand) -> u16 {
     }
 }
 
-pub fn encode_branch(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_branch(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let disp8 = encode_8bit_displacement(pc + 2, &op.operands[0]);
     assert_no_overlap(&op, template, disp8, 0);
     let pc = mem.write_word(pc, template | disp8);
     op.operands[0].add_extension_words(pc, mem)
 }
-pub fn encode_moveq(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_moveq(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let data = if let Operand::Number(Size::Byte, val) = op.operands[0] {
         val as u8 as u16
     } else {
@@ -292,7 +292,7 @@ pub fn encode_moveq(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory
     assert_no_overlap(&op, template, data, dx);
     mem.write_word(pc, template | data | dx)
 }
-pub fn encode_movem_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_movem_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let ea = encode_ea(&op.operands[1]);
     assert_no_overlap(&op, template, ea, 0);
     let pc = mem.write_word(pc, template | ea);
@@ -308,7 +308,7 @@ pub fn encode_movem_ea(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Mem
     let pc = possibly_reversed.add_extension_words(pc, mem);
     op.operands[1].add_extension_words(pc, mem)
 }
-pub fn encode_ea_movem(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn encode_ea_movem(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     let ea = encode_ea(&op.operands[0]);
     assert_no_overlap(&op, template, ea, 0);
     let pc = mem.write_word(pc, template | ea);
@@ -316,7 +316,7 @@ pub fn encode_ea_movem(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Mem
     op.operands[0].add_extension_words(pc, mem)
 }
 #[allow(unused_variables)]
-pub fn nop_encoder(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut Memory) -> PC {
+pub fn nop_encoder(op: &OpcodeInstance, template: u16, pc: PC, mem: &mut dyn Memory) -> PC {
     pc
 }
 #[allow(unused_variables)]
@@ -676,8 +676,8 @@ impl<'b> Assembler<'b> {
         if self.branches.contains(op_inst.mnemonic) {
             clone.operands = op_inst.operands.iter().map(|&op| match op {
                 Operand::Number(Size::Unsized, x) if op_inst.size == Size::Byte => Operand::Branch(Size::Byte, x as u32),
-                Operand::Number(Size::Unsized, x) => Operand::Branch(Size::Word, x as u32),
-                Operand::Number(Size::Unsized, x) => Operand::Branch(Size::Long, x as u32),
+                Operand::Number(Size::Unsized, x) if op_inst.size == Size::Word => Operand::Branch(Size::Word, x as u32),
+                Operand::Number(Size::Unsized, x) if op_inst.size == Size::Long => Operand::Branch(Size::Long, x as u32),
                 Operand::Number(size, x) => Operand::Branch(size, x as u32),
                 x => x,
             }).collect();
@@ -713,7 +713,7 @@ impl<'b> Assembler<'b> {
         clone
     }
 
-    pub fn encode_instruction(&self, instruction: &str, op_inst: &OpcodeInstance, pc: PC, mem: &mut Memory) -> PC
+    pub fn encode_instruction(&self, instruction: &str, op_inst: &OpcodeInstance, pc: PC, mem: &mut dyn Memory) -> PC
     {
         for op in &self.optable {
             assert!(op.mask & op.matching == op.matching, "mask/matching mismatch {:04x} & {:04x} for {}{}", op.mask, op.matching, op.mnemonic, op.size);
@@ -725,7 +725,7 @@ impl<'b> Assembler<'b> {
         panic!("Could not assemble {} ({:?})", instruction, op_inst);
     }
 
-    pub fn assemble(&self, reader: &mut BufRead) ->  io::Result<(PC, MemoryVec)> {
+    pub fn assemble(&self, reader: &mut dyn BufRead) ->  io::Result<(PC, MemoryVec)> {
         let mut mem = MemoryVec::new();
         let mut pc = PC(0);
 
