@@ -12,6 +12,6 @@ unset -v TESTEXE
 for file in "$TESTPATTERN"/*.exe; do
   [[ $file -nt $TESTEXE ]] && TESTEXE=$file
 done
-RUST_BACKTRACE=1 parallel "$TESTEXE {} > $results/{}.log; if [ \$? -eq 0 ]; then rm $results/{}.log; fi" ::: $OPS
+RUST_BACKTRACE=1 time parallel "$TESTEXE {} > $results/{}.log; if [ \$? -eq 0 ]; then rm $results/{}.log; fi" ::: $OPS
 fi
 # ./find-errs

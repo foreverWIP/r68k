@@ -175,6 +175,12 @@ use super::InstructionSet;
 pub fn instruction_set<T: Core>() -> InstructionSet<T> {
     handlers::InstructionSetGenerator::new().generate()
 }
+
+extern crate once_cell;
+use self::once_cell::sync::Lazy;
+use cpu::TestCore;
+pub static INSTRUCTION_SET_TEST: Lazy<std::sync::Arc<InstructionSet<TestCore>>> = Lazy::new(|| std::sync::Arc::new(instruction_set::<TestCore>()));
+
 use std::num::Wrapping;
 use super::operator;
 

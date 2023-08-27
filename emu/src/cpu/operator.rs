@@ -168,7 +168,7 @@ pub fn ea_ax_pd_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
 }
 pub fn ea_ay_pi_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::postincrement_ay_32(core)
-    .and_then(|ea| core.read_data_long(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_long(ea).map(|val| (val, ea)))
 }
 pub fn ea_ay_ai_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::address_indirect_ay(core)
@@ -197,11 +197,11 @@ pub fn ay_pd_32<T: Core>(core: &mut T) -> Result<u32> {
 }
 pub fn ay_pi_32<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::postincrement_ay_32(core)
-    .and_then(|ea| core.read_data_long(ea))
+    .and_then(|ea| core.read_program_long(ea))
 }
 pub fn ax_pi_32<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::postincrement_ax_32(core)
-    .and_then(|ea| core.read_data_long(ea))
+    .and_then(|ea| core.read_program_long(ea))
 }
 pub fn ay_ai_32<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::address_indirect_ay(core)

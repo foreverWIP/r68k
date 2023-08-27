@@ -511,7 +511,7 @@ mod tests {
             [((OPCODE_UNDER_TEST >> 8) & 0xff) as u8, (OPCODE_UNDER_TEST & 0xff) as u8]
         };
         let Bitpattern(memory_initializer) = memory_pattern;
-        let mut musashi = TestCore::new_mem_init(pc, &mem, memory_initializer & mem_mask);
+        let mut musashi = TestCore::new_mem_init_for_tests(pc, &mem, memory_initializer & mem_mask);
         const STACK_MASK:u32 = 1024-16; // keep even
         musashi.inactive_ssp = 0x128;
         musashi.inactive_usp = 0x256;
@@ -2673,7 +2673,7 @@ mod tests {
         assert_eq!(0x55555, cpu.dar[5]);
 
         let ops = get_ops();
-        assert_eq!(1, ops.len());
+        assert_eq!(2, ops.len());
         assert_eq!(Operation::ReadLong(SUPERVISOR_PROGRAM, pc, 0xc1010000), ops[0]);
     }
 
@@ -2719,6 +2719,7 @@ mod tests {
         initialize_musashi(&mut musashi, 0xaaaaaaaa);
 
         // execute ABCD        D1, D0
+        execute1(&mut musashi);
         execute1(&mut musashi);
         r68k.execute1();
         assert_eq!(0x42, musashi.dar[1]);

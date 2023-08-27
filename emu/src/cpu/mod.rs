@@ -91,7 +91,7 @@ pub struct ConfiguredCore<T: InterruptController, A: AddressBus> {
     pub inactive_usp: u32, // when in supervisor mode
     pub ir: u16,
     pub dar: [u32; 16],
-    instruction_set: InstructionSet<ConfiguredCore<T, A>>,
+    instruction_set: std::sync::Arc<InstructionSet<ConfiguredCore<T, A>>>,
     pub s_flag: u32,
     pub irq_level: u8,
     pub int_mask: u32,
@@ -520,7 +520,7 @@ impl TestCore {
     pub fn new(base: u32) -> TestCore {
         TestCore {
             pc: base, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: 0, inactive_usp: 0, ir: 0, processing_state: ProcessingState::Group0Exception,
-            dar: [0u32; 16], mem: LoggingMem::new(0xaaaa_aaaa, OpsLogger::new()), instruction_set: ops::instruction_set(),
+            dar: [0u32; 16], mem: LoggingMem::new(0xaaaa_aaaa, OpsLogger::new()), instruction_set: std::sync::Arc::new(ops::instruction_set()),
             irq_level: 0, int_ctrl: AutoInterruptController::new(),
             s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
             fc_is_data: false,
@@ -539,7 +539,20 @@ impl TestCore {
         }
         TestCore {
             pc: base, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: 0, inactive_usp: 0, ir: 0, processing_state: ProcessingState::Normal,
-            dar: [0u32; 16], mem: lm, instruction_set: ops::instruction_set(),
+            dar: [0u32; 16], mem: lm, instruction_set: std::sync::Arc::new(ops::instruction_set()),
+            irq_level: 0, int_ctrl: AutoInterruptController::new(),
+            s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
+            fc_is_data: false,
+        }
+    }
+    pub fn new_mem_init_for_tests(base: u32, contents: &[u8], initializer: u32) -> TestCore {
+        let mut lm = LoggingMem::new(initializer, OpsLogger::new());
+        for (offset, byte) in contents.iter().enumerate() {
+            lm.write_u8(base + offset as u32, u32::from(*byte));
+        }
+        TestCore {
+            pc: base, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: 0, inactive_usp: 0, ir: 0, processing_state: ProcessingState::Normal,
+            dar: [0u32; 16], mem: lm, instruction_set: (*ops::INSTRUCTION_SET_TEST).clone(),
             irq_level: 0, int_ctrl: AutoInterruptController::new(),
             s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
             fc_is_data: false,
@@ -551,7 +564,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     pub fn new_with(base: u32, int_ctrl: T, memory: A) -> ConfiguredCore<T, A> {
         ConfiguredCore {
             pc: base, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: 0, inactive_usp: 0, ir: 0, processing_state: ProcessingState::Group0Exception,
-            dar: [0u32; 16], mem: memory, instruction_set: ops::instruction_set(),
+            dar: [0u32; 16], mem: memory, instruction_set: std::sync::Arc::new(ops::instruction_set()),
             irq_level: 0, int_ctrl,
             s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
             fc_is_data: false,
@@ -988,7 +1001,7 @@ impl Clone for TestCore {
         assert_eq!(0, lm.logger.len());
         TestCore {
             pc: self.pc, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: self.inactive_ssp, inactive_usp: self.inactive_usp, ir: self.ir, processing_state: self.processing_state,
-            dar: self.dar, mem: lm, instruction_set: ops::instruction_set(),
+            dar: self.dar, mem: lm, instruction_set: self.instruction_set.clone(),
             irq_level: 0, int_ctrl: AutoInterruptController::new(),
             s_flag: self.s_flag, int_mask: self.int_mask, x_flag: self.x_flag, v_flag: self.v_flag, c_flag: self.c_flag, n_flag: self.n_flag, not_z_flag: self.not_z_flag,
             fc_is_data: false,
@@ -1104,7 +1117,7 @@ mod tests {
     #[test]
     fn execute_can_execute_instruction_handler_0a() {
         let mut cpu = TestCore::new_mem(0xba, &[0x00, 0x0A, 1u8,0u8, 0u8,0u8,0u8,128u8]);
-        cpu.instruction_set = ops::fake::instruction_set();
+        cpu.instruction_set = std::sync::Arc::new(ops::fake::instruction_set());
         cpu.execute1();
         assert_eq!(0xabcd, cpu.dar[0]);
         assert_eq!(0x0000, cpu.dar[1]);
@@ -1113,7 +1126,7 @@ mod tests {
     #[test]
     fn execute_can_execute_instruction_handler_0b() {
         let mut cpu = TestCore::new_mem(0xba, &[0x00, 0x0B, 1u8,0u8, 0u8,0u8,0u8,128u8]);
-        cpu.instruction_set = ops::fake::instruction_set();
+        cpu.instruction_set = std::sync::Arc::new(ops::fake::instruction_set());
         cpu.execute1();
         assert_eq!(0x0000, cpu.dar[0]);
         assert_eq!(0xbcde, cpu.dar[1]);
@@ -1131,7 +1144,7 @@ mod tests {
         // 4c == D6
         // 4e == D7
         let mut cpu = TestCore::new_mem(0x40, &[0x4c, 0x00, 1u8, 0u8]);
-        cpu.instruction_set = ops::fake::instruction_set();
+        cpu.instruction_set = std::sync::Arc::new(ops::fake::instruction_set());
         cpu.execute1();
         assert_eq!(0xcdef, cpu.dar[6]);
     }
