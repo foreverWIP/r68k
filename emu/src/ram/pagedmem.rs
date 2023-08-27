@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use super::{AddressSpace, AddressBus, ADDRBUS_MASK};
+use super::{AddressSpace, AddressBus, ADDRBUS_MASK, Segment};
 
 const PAGE_SIZE: u32 = 16; // 16 bytes page size
 const ADDR_MASK: u32 = PAGE_SIZE - 1; // all ones

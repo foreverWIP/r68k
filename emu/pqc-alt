@@ -4,9 +4,14 @@ echo Compiling and running standard tests...
 results=target/debug/qc-results
 rm -rf $results
 mkdir -p $results
-OPS=$(cargo test -- --list 2> /dev/null | sed 's/: test//' | grep "musashi::tests::qc")
+OPS=$(cargo test -- --list 2> /dev/null | sed 's/: test//') #| grep "musashi::tests::qc")
 cargo test --no-run
 if [ ${PIPESTATUS[0]} -eq 0 ]; then
-RUST_BACKTRACE=1 parallel cargo test {} "2>" /dev/null "1>" $results/{}.log ::: $OPS
+TESTPATTERN="../target/debug/deps"
+unset -v TESTEXE
+for file in "$TESTPATTERN"/*.exe; do
+  [[ $file -nt $TESTEXE ]] && TESTEXE=$file
+done
+RUST_BACKTRACE=1 parallel "$TESTEXE {} > $results/{}.log; if [ \$? -eq 0 ]; then rm $results/{}.log; fi" ::: $OPS
 fi
 # ./find-errs

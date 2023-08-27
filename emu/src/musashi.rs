@@ -219,10 +219,10 @@ pub extern fn cpu_long_branch() {}
 pub extern fn m68k_set_fc(fc: u32) {
     unsafe {
         MUSASHI_ADDRESS_SPACE = match fc {
-            1 => USER_DATA,
-            2 => USER_PROGRAM,
-            5 => SUPERVISOR_DATA,
-            6 => SUPERVISOR_PROGRAM,
+            0b001 => USER_DATA,
+            0b010 => USER_PROGRAM,
+            0b101 => SUPERVISOR_DATA,
+            0b110 => SUPERVISOR_PROGRAM,
             _ => panic!("unknown fc: {}", fc),
         };
         // println!("set_fc {:?}", MUSASHI_ADDRESS_SPACE);
@@ -238,7 +238,10 @@ use std::ptr;
 
 #[allow(unused_variables)]
 pub fn experimental_communication() {
-    let _mutex = MUSASHI_LOCK.lock();
+    let _guard = match MUSASHI_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
 
     unsafe {
         m68k_init();
@@ -250,7 +253,10 @@ pub fn experimental_communication() {
 
 #[allow(unused_variables)]
 pub fn roundtrip_register(reg: Register, value: u32) -> u32 {
-    let _mutex = MUSASHI_LOCK.lock();
+    let _guard = match MUSASHI_LOCK.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
 
     unsafe {
         m68k_init();
@@ -362,18 +368,16 @@ pub fn reset_and_execute1(core: &mut TestCore, memory_initializer: u32) -> Cycle
 // global/static context, and statics are not allowed to have
 // destructors
 use std::sync::Mutex;
-extern crate once_cell;
-use musashi::once_cell::sync::Lazy;
 
-static MUSASHI_LOCK: Lazy<Mutex<i32>> = Lazy::new(|| Mutex::new(0));
-static QUICKCHECK_LOCK: Lazy<Mutex<i32>> = Lazy::new(|| Mutex::new(0));
+static MUSASHI_LOCK: Mutex<i32> = Mutex::new(0);
+static QUICKCHECK_LOCK: Mutex<i32> = Mutex::new(0);
 
 mod tests {
     use super::*;
     use ram::SUPERVISOR_PROGRAM;
     use super::MUSASHI_LOCK;
     use super::QUICKCHECK_LOCK;
-    use ram::{AddressBus};
+    use ram::AddressBus;
     use ram::loggingmem::Operation;
     use cpu::{TestCore, EXCEPTION_ZERO_DIVIDE, EXCEPTION_CHK, Cycles};
     use std::cmp;
@@ -557,8 +561,12 @@ mod tests {
                 },
             }
         }
+        musashi.s_flag = 4;
         let mut r68k = musashi.clone(); // so very self-aware!
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         let musashi_cycles = reset_and_execute1(&mut musashi, memory_initializer & mem_mask);
         let r68k_cycles = r68k.execute(super::EXEC_CYCLES);
@@ -601,7 +609,10 @@ mod tests {
             fn $fn_name() {
             // Musashi isn't thread safe, and the construct with OPCODE_UNDER_TEST
             // isn't either. :(
-            let _mutex = QUICKCHECK_LOCK.lock();
+            let _guard = match QUICKCHECK_LOCK.lock() {
+                Ok(guard) => guard,
+                Err(poisoned) => poisoned.into_inner(),
+            };
             // check for mask/opcode inconsistency
             assert!($opmask & $opcode == $opcode);
             let qc_rounds = cmp::max(1, 384 >> ($opmask as u16).count_zeros());
@@ -2643,7 +2654,10 @@ mod tests {
 
     #[test]
     fn roundtrip_abcd_rr() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         let pc = 0x40;
         // 0xc101: ABCD        D0, D1
@@ -2665,7 +2679,10 @@ mod tests {
 
     #[test]
     fn compare_abcd_rr() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         let pc = 0x40;
         // 0xc300: ABCD        D1, D0
@@ -2684,7 +2701,10 @@ mod tests {
 
     #[test]
     fn run_abcd_rr_twice() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         let pc = 0x40;
         // 0xc300: ABCD        D1, D0
@@ -2715,7 +2735,10 @@ mod tests {
 
     #[test]
     fn compare_address_error_actions() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         // using an odd absolute address should force an address error
         // opcodes d278,0107 is ADD.W    $0107, D1
@@ -2734,7 +2757,10 @@ mod tests {
     }
     #[test]
     fn compare_illegal_instruction_actions() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         // d208 is ADD.B A0,D0, which is illegal
         let mut musashi = TestCore::new_mem(0x4000, &[0xd2, 08]);
@@ -2756,7 +2782,10 @@ use super::m68k_get_reg;
 
     #[test]
     fn stackpointers_are_correct_when_starting_in_supervisor_mode() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         let pc = 0x40;
         // 0xc300: ABCD        D1, D0
@@ -2774,7 +2803,10 @@ use super::m68k_get_reg;
     }
     #[test]
     fn stackpointers_are_correct_when_starting_in_user_mode() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         let pc = 0x40;
         // 0xc300: ABCD        D1, D0
@@ -2796,7 +2828,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn read_initialized_memory() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         for v in 0..256 {
@@ -2824,7 +2859,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn read_your_u32_writes() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         let pattern = 0xAAAA7777;
@@ -2836,7 +2874,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn read_your_u16_writes() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         let pattern = 0xAAAA7777;
@@ -2848,7 +2889,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn read_your_u8_writes() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         let pattern = 0xAAAA7777;
@@ -2860,7 +2904,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn shared_address_space() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         let pattern = 0xAAAA7777;
@@ -2887,7 +2934,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn do_read_byte_is_logged() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -2900,7 +2950,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn do_read_word_is_logged() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -2913,7 +2966,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn do_read_long_is_logged() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -2926,7 +2982,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn do_write_byte_is_logged() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -2940,7 +2999,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn do_write_word_is_logged() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -2954,7 +3016,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn do_write_long_is_logged() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -2969,7 +3034,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
     #[test]
     fn page_allocation_on_write_unless_matching_initializer()
     {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         let data = 0x01020304;
         initialize_musashi_memory(data);
@@ -2998,7 +3066,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn cross_boundary_byte_access() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         m68k_write_memory_8(ADDRBUS_MASK, 0x91);
@@ -3009,7 +3080,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn cross_boundary_word_access() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         m68k_write_memory_16(ADDRBUS_MASK+1, 0x9192);
@@ -3018,7 +3092,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 
     #[test]
     fn cross_boundary_long_access() {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         initialize_musashi_memory(0x01020304);
         m68k_write_memory_32(ADDRBUS_MASK-1, 0x91929394);
@@ -3043,7 +3120,10 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
     }
 
     fn test_interrupts(mask: u16, irq: u32) {
-        let _mutex = MUSASHI_LOCK.lock();
+        let _guard = match MUSASHI_LOCK.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
 
         // opcodes d278,0108 is ADD.W    $0108, D1
         let mut musashi = TestCore::new_mem(0x4000, &[0xd2, 0x78, 0x01, 0x08, 0xd2, 0x78, 0x01, 0x08, 0xd2, 0x78, 0x01, 0x08]);
@@ -3061,6 +3141,7 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         unsafe {
             m68k_set_irq(irq);
         }
+        execute1(&mut musashi);
         let musashi_cycles = execute1(&mut musashi);
         r68k.int_ctrl.request_interrupt(irq as u8);
         let mut r68k_cycles = r68k.execute1();

@@ -4,11 +4,11 @@ use super::{Core, Result};
 
 pub fn ea_ay_pd_8<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::predecrement_ay_8(core)
-    .and_then(|ea| core.read_data_byte(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_byte(ea).map(|val| (val, ea)))
 }
 pub fn ea_ax_pd_8<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::predecrement_ax_8(core)
-    .and_then(|ea| core.read_data_byte(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_byte(ea).map(|val| (val, ea)))
 }
 pub fn ea_ay_pi_8<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::postincrement_ay_8(core)
@@ -16,28 +16,28 @@ pub fn ea_ay_pi_8<T: Core>(core: &mut T) -> Result<(u32, u32)> {
 }
 pub fn ea_ay_ai_8<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::address_indirect_ay(core)
-    .and_then(|ea| core.read_data_byte(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_byte(ea).map(|val| (val, ea)))
 }
 pub fn ea_ay_di_8<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::displacement_ay(core)
-    .and_then(|ea| core.read_data_byte(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_byte(ea).map(|val| (val, ea)))
 }
 pub fn ea_ay_ix_8<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::index_ay(core)
-    .and_then(|ea| core.read_data_byte(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_byte(ea).map(|val| (val, ea)))
 }
 pub fn ea_aw_8<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::absolute_word(core)
-    .and_then(|ea| core.read_data_byte(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_byte(ea).map(|val| (val, ea)))
 }
 pub fn ea_al_8<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::absolute_long(core)
-    .and_then(|ea| core.read_data_byte(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_byte(ea).map(|val| (val, ea)))
 }
 
 pub fn ay_pd_8<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::predecrement_ay_8(core)
-    .and_then(|ea| core.read_data_byte(ea))
+    .and_then(|ea| core.read_program_byte(ea))
 }
 pub fn ay_pi_8<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::postincrement_ay_8(core)
@@ -49,23 +49,23 @@ pub fn ax_pi_8<T: Core>(core: &mut T) -> Result<u32> {
 }
 pub fn ay_ai_8<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::address_indirect_ay(core)
-    .and_then(|ea| core.read_data_byte(ea))
+    .and_then(|ea| core.read_program_byte(ea))
 }
 pub fn ay_di_8<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::displacement_ay(core)
-    .and_then(|ea| core.read_data_byte(ea))
+    .and_then(|ea| core.read_program_byte(ea))
 }
 pub fn ay_ix_8<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::index_ay(core)
-    .and_then(|ea| core.read_data_byte(ea))
+    .and_then(|ea| core.read_program_byte(ea))
 }
 pub fn aw_8<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::absolute_word(core)
-    .and_then(|ea| core.read_data_byte(ea))
+    .and_then(|ea| core.read_program_byte(ea))
 }
 pub fn al_8<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::absolute_long(core)
-    .and_then(|ea| core.read_data_byte(ea))
+    .and_then(|ea| core.read_program_byte(ea))
 }
 pub fn pcdi_8<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::displacement_pc(core)
@@ -82,68 +82,68 @@ pub fn imm_8<T: Core>(core: &mut T) -> Result<u32> {
 
 pub fn ea_ay_pd_16<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::predecrement_ay_16(core)
-    .and_then(|ea| core.read_data_word(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_word(ea).map(|val| (val, ea)))
 }
 pub fn ea_ax_pd_16<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::predecrement_ax_16(core)
-    .and_then(|ea| core.read_data_word(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_word(ea).map(|val| (val, ea)))
 }
 pub fn ea_ay_pi_16<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::postincrement_ay_16(core)
-    .and_then(|ea| core.read_data_word(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_word(ea).map(|val| (val, ea)))
 }
 pub fn ea_ay_ai_16<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::address_indirect_ay(core)
-    .and_then(|ea| core.read_data_word(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_word(ea).map(|val| (val, ea)))
 }
 pub fn ea_ay_di_16<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::displacement_ay(core)
-    .and_then(|ea| core.read_data_word(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_word(ea).map(|val| (val, ea)))
 }
 pub fn ea_ay_ix_16<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::index_ay(core)
-    .and_then(|ea| core.read_data_word(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_word(ea).map(|val| (val, ea)))
 }
 pub fn ea_aw_16<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::absolute_word(core)
-    .and_then(|ea| core.read_data_word(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_word(ea).map(|val| (val, ea)))
 }
 pub fn ea_al_16<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::absolute_long(core)
-    .and_then(|ea| core.read_data_word(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_word(ea).map(|val| (val, ea)))
 }
 
 pub fn ay_pd_16<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::predecrement_ay_16(core)
-    .and_then(|ea| core.read_data_word(ea))
+    .and_then(|ea| core.read_program_word(ea))
 }
 pub fn ay_pi_16<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::postincrement_ay_16(core)
-    .and_then(|ea| core.read_data_word(ea))
+    .and_then(|ea| core.read_program_word(ea))
 }
 pub fn ax_pi_16<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::postincrement_ax_16(core)
-    .and_then(|ea| core.read_data_word(ea))
+    .and_then(|ea| core.read_program_word(ea))
 }
 pub fn ay_ai_16<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::address_indirect_ay(core)
-    .and_then(|ea| core.read_data_word(ea))
+    .and_then(|ea| core.read_program_word(ea))
 }
 pub fn ay_di_16<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::displacement_ay(core)
-    .and_then(|ea| core.read_data_word(ea))
+    .and_then(|ea| core.read_program_word(ea))
 }
 pub fn ay_ix_16<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::index_ay(core)
-    .and_then(|ea| core.read_data_word(ea))
+    .and_then(|ea| core.read_program_word(ea))
 }
 pub fn aw_16<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::absolute_word(core)
-    .and_then(|ea| core.read_data_word(ea))
+    .and_then(|ea| core.read_program_word(ea))
 }
 pub fn al_16<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::absolute_long(core)
-    .and_then(|ea| core.read_data_word(ea))
+    .and_then(|ea| core.read_program_word(ea))
 }
 pub fn pcdi_16<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::displacement_pc(core)
@@ -160,11 +160,11 @@ pub fn imm_16<T: Core>(core: &mut T) -> Result<u32> {
 
 pub fn ea_ay_pd_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::predecrement_ay_32(core)
-    .and_then(|ea| core.read_data_long(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_long(ea).map(|val| (val, ea)))
 }
 pub fn ea_ax_pd_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::predecrement_ax_32(core)
-    .and_then(|ea| core.read_data_long(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_long(ea).map(|val| (val, ea)))
 }
 pub fn ea_ay_pi_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::postincrement_ay_32(core)
@@ -172,28 +172,28 @@ pub fn ea_ay_pi_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
 }
 pub fn ea_ay_ai_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::address_indirect_ay(core)
-    .and_then(|ea| core.read_data_long(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_long(ea).map(|val| (val, ea)))
 }
 pub fn ea_ay_di_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::displacement_ay(core)
-    .and_then(|ea| core.read_data_long(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_long(ea).map(|val| (val, ea)))
 }
 pub fn ea_ay_ix_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::index_ay(core)
-    .and_then(|ea| core.read_data_long(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_long(ea).map(|val| (val, ea)))
 }
 pub fn ea_aw_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::absolute_word(core)
-    .and_then(|ea| core.read_data_long(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_long(ea).map(|val| (val, ea)))
 }
 pub fn ea_al_32<T: Core>(core: &mut T) -> Result<(u32, u32)> {
     effective_address::absolute_long(core)
-    .and_then(|ea| core.read_data_long(ea).map(|val| (val, ea)))
+    .and_then(|ea| core.read_program_long(ea).map(|val| (val, ea)))
 }
 
 pub fn ay_pd_32<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::predecrement_ay_32(core)
-    .and_then(|ea| core.read_data_long(ea))
+    .and_then(|ea| core.read_program_long(ea))
 }
 pub fn ay_pi_32<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::postincrement_ay_32(core)
@@ -205,23 +205,23 @@ pub fn ax_pi_32<T: Core>(core: &mut T) -> Result<u32> {
 }
 pub fn ay_ai_32<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::address_indirect_ay(core)
-    .and_then(|ea| core.read_data_long(ea))
+    .and_then(|ea| core.read_program_long(ea))
 }
 pub fn ay_di_32<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::displacement_ay(core)
-    .and_then(|ea| core.read_data_long(ea))
+    .and_then(|ea| core.read_program_long(ea))
 }
 pub fn ay_ix_32<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::index_ay(core)
-    .and_then(|ea| core.read_data_long(ea))
+    .and_then(|ea| core.read_program_long(ea))
 }
 pub fn aw_32<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::absolute_word(core)
-    .and_then(|ea| core.read_data_long(ea))
+    .and_then(|ea| core.read_program_long(ea))
 }
 pub fn al_32<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::absolute_long(core)
-    .and_then(|ea| core.read_data_long(ea))
+    .and_then(|ea| core.read_program_long(ea))
 }
 pub fn pcdi_32<T: Core>(core: &mut T) -> Result<u32> {
     effective_address::displacement_pc(core)

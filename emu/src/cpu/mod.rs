@@ -32,12 +32,20 @@ pub trait Core {
     fn read_program_byte(&mut self, address: u32) -> Result<u32>;
     fn read_program_word(&mut self, address: u32) -> Result<u32>;
     fn read_program_long(&mut self, address: u32) -> Result<u32>;
+    fn read_fc_byte(&mut self, address: u32) -> Result<u32>;
+    fn read_fc_word(&mut self, address: u32) -> Result<u32>;
+    fn read_fc_long(&mut self, address: u32) -> Result<u32>;
     fn write_data_byte(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_data_word(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_data_long(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_program_byte(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_program_word(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_program_long(&mut self, address: u32, value: u32) -> Result<()>;
+    fn write_fc_byte(&mut self, address: u32, value: u32) -> Result<()>;
+    fn write_fc_word(&mut self, address: u32, value: u32) -> Result<()>;
+    fn write_fc_long(&mut self, address: u32, value: u32) -> Result<()>;
+    fn is_fc_data(&self) -> bool;
+    fn set_fc(&mut self, is_data: bool);
     fn status_register(&self) -> u16;
     fn condition_code_register(&self) -> u16;
     fn sr_to_flags(&mut self, sr: u16);
@@ -97,6 +105,7 @@ pub struct ConfiguredCore<T: InterruptController, A: AddressBus> {
     pub not_z_flag: u32,
     pub processing_state: ProcessingState,
     pub mem: A,
+    fc_is_data: bool,
 }
 impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
     fn dar(&mut self) -> &mut [u32; 16] {
@@ -163,6 +172,27 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
     fn read_program_long(&mut self, address: u32) -> Result<u32> {
         self.read_program_long(address)
     }
+    fn read_fc_byte(&mut self, address: u32) -> Result<u32> {
+        if self.fc_is_data {
+            self.read_data_byte(address)
+        } else {
+            self.read_program_byte(address)
+        }
+    }
+    fn read_fc_word(&mut self, address: u32) -> Result<u32> {
+        if self.fc_is_data {
+            self.read_data_word(address)
+        } else {
+            self.read_program_word(address)
+        }
+    }
+    fn read_fc_long(&mut self, address: u32) -> Result<u32> {
+        if self.fc_is_data {
+            self.read_data_long(address)
+        } else {
+            self.read_program_long(address)
+        }
+    }
     fn write_data_byte(&mut self, address: u32, value: u32) -> Result<()> {
         self.write_data_byte(address, value)
     }
@@ -180,6 +210,33 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
     }
     fn write_program_long(&mut self, address: u32, value: u32) -> Result<()> {
         self.write_program_long(address, value)
+    }
+    fn write_fc_byte(&mut self, address: u32, value: u32) -> Result<()> {
+        if self.fc_is_data {
+            self.write_data_byte(address, value)
+        } else {
+            self.write_program_byte(address, value)
+        }
+    }
+    fn write_fc_word(&mut self, address: u32, value: u32) -> Result<()> {
+        if self.fc_is_data {
+            self.write_data_word(address, value)
+        } else {
+            self.write_program_word(address, value)
+        }
+    }
+    fn write_fc_long(&mut self, address: u32, value: u32) -> Result<()> {
+        if self.fc_is_data {
+            self.write_data_long(address, value)
+        } else {
+            self.write_program_long(address, value)
+        }
+    }
+    fn is_fc_data(&self) -> bool {
+        self.fc_is_data
+    }
+    fn set_fc(&mut self, is_data: bool) {
+        self.fc_is_data = is_data;
     }
     fn status_register(&self) -> u16 {
         self.status_register()
@@ -465,7 +522,8 @@ impl TestCore {
             pc: base, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: 0, inactive_usp: 0, ir: 0, processing_state: ProcessingState::Group0Exception,
             dar: [0u32; 16], mem: LoggingMem::new(0xaaaa_aaaa, OpsLogger::new()), instruction_set: ops::instruction_set(),
             irq_level: 0, int_ctrl: AutoInterruptController::new(),
-            s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff
+            s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
+            fc_is_data: false,
         }
     }
     pub fn new_auto() -> TestCore {
@@ -483,7 +541,8 @@ impl TestCore {
             pc: base, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: 0, inactive_usp: 0, ir: 0, processing_state: ProcessingState::Normal,
             dar: [0u32; 16], mem: lm, instruction_set: ops::instruction_set(),
             irq_level: 0, int_ctrl: AutoInterruptController::new(),
-            s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff
+            s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
+            fc_is_data: false,
         }
     }
 }
@@ -494,7 +553,8 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
             pc: base, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: 0, inactive_usp: 0, ir: 0, processing_state: ProcessingState::Group0Exception,
             dar: [0u32; 16], mem: memory, instruction_set: ops::instruction_set(),
             irq_level: 0, int_ctrl,
-            s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff
+            s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
+            fc_is_data: false,
         }
     }
     pub fn reset(&mut self) {
@@ -584,31 +644,12 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         if 0 < (sr >> 1) & 1 {'V'} else {'-'},
         if 0 < (sr     ) & 1 {'C'} else {'-'})
     }
-    fn prefetch_if_needed(&mut self) -> bool {
-        // does current PC overlap with fetched data
-        let fetched = if self.pc & !3 != self.prefetch_addr {
-            self.prefetch_addr = self.pc & !3;
-            let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
-            self.prefetch_data = self.mem.read_long(address_space, self.prefetch_addr);
-            true
-        } else {
-            false
-        };
-        self.pc = self.pc.wrapping_add(2);
-        fetched
-    }
     pub fn read_imm_u32(&mut self) -> Result<u32> {
+        self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if self.pc & 1 > 0 {
             return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
-        /*self.prefetch_if_needed();
-        let prev_prefetch_data = self.prefetch_data;
-        Ok(if self.prefetch_if_needed() {
-            (prev_prefetch_data << 16) | (self.prefetch_data >> 16)
-        } else {
-            prev_prefetch_data
-        })*/
         let mut temp_val = 0u32;
         if self.pc != self.prefetch_addr {
             self.prefetch_addr = self.pc;
@@ -627,16 +668,17 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         Ok(temp_val)
     }
     pub fn read_imm_i16(&mut self) -> Result<i16> {
-        self.read_imm_u16().map(|val| val as i16)
+        match self.read_imm_u16() {
+            Ok(value) => Ok(value as i16),
+            Err(e) => Err(e)
+        }
     }
     pub fn read_imm_u16(&mut self) -> Result<u16> {
-        // the Musashi read_imm_16 calls cpu_read_long as part of prefetch
+        self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if self.pc & 1 > 0 {
             return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
-        // self.prefetch_if_needed();
-        // Ok(((self.prefetch_data >> ((2 - ((self.pc.wrapping_sub(2)) & 2))<<3)) & 0xffff) as u16)
         let mut result = 0u32;
         if self.pc != self.prefetch_addr {
             self.prefetch_addr = self.pc;
@@ -651,30 +693,30 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     pub fn push_sp(&mut self) -> u32 {
          let new_sp = (Wrapping(self.dar[15]) - Wrapping(4)).0;
          self.dar[15] = new_sp;
-         self.write_data_long(new_sp, new_sp).unwrap();
+         self.write_fc_long(new_sp, new_sp).unwrap();
          new_sp
     }
     pub fn push_32(&mut self, value: u32) -> u32 {
          let new_sp = (Wrapping(self.dar[15]) - Wrapping(4)).0;
          self.dar[15] = new_sp;
-         self.write_data_long(new_sp, value).unwrap();
+         self.write_fc_long(new_sp, value).unwrap();
          new_sp
     }
     pub fn pop_32(&mut self) -> u32 {
         let sp = self.dar[15];
-        let data = self.read_data_long(sp).unwrap();
+        let data = self.read_fc_long(sp).unwrap();
         self.dar[15] = sp.wrapping_add(4);
         data
     }
     pub fn push_16(&mut self, value: u16) -> u32 {
          let new_sp = (Wrapping(self.dar[15]) - Wrapping(2)).0;
          self.dar[15] = new_sp;
-         self.write_data_word(new_sp, u32::from(value)).unwrap();
+         self.write_program_word(new_sp, u32::from(value)).unwrap();
          new_sp
     }
     pub fn pop_16(&mut self) -> u16 {
         let sp = self.dar[15];
-        let data = self.read_data_word(sp).unwrap() as u16;
+        let data = self.read_program_word(sp).unwrap() as u16;
         self.dar[15] = sp.wrapping_add(2);
         data
     }
@@ -707,6 +749,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     pub fn read_program_word(&mut self, address: u32) -> Result<u32> {
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
+            // println!("{}", std::backtrace::Backtrace::force_capture());
             Err(Exception::AddressError {address, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         } else {
             Ok(self.mem.read_word(address_space, address))
@@ -769,7 +812,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     }
     pub fn jump_vector(&mut self, vector: u8) {
         let vector_address = u32::from(vector) << 2;
-        self.pc = self.read_data_long(vector_address).unwrap();
+        self.pc = self.read_fc_long(vector_address).unwrap();
     }
     pub fn ensure_supervisor_mode(&mut self) -> u16 {
         let backup_sr = self.status_register();
@@ -804,7 +847,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
          */
         let access_info = match access_type {AccessType::Read => 0b10000, _ => 0 } |
             if processing_state.instruction_processing() { 0 } else { 0b01000 } |
-            (address_space.fc() as u16);
+            ((if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA}).fc() as u16);
         self.push_16(access_info);
         self.jump_vector(EXCEPTION_ADDRESS_ERROR);
         Cycles(50)
@@ -947,7 +990,8 @@ impl Clone for TestCore {
             pc: self.pc, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: self.inactive_ssp, inactive_usp: self.inactive_usp, ir: self.ir, processing_state: self.processing_state,
             dar: self.dar, mem: lm, instruction_set: ops::instruction_set(),
             irq_level: 0, int_ctrl: AutoInterruptController::new(),
-            s_flag: self.s_flag, int_mask: self.int_mask, x_flag: self.x_flag, v_flag: self.v_flag, c_flag: self.c_flag, n_flag: self.n_flag, not_z_flag: self.not_z_flag
+            s_flag: self.s_flag, int_mask: self.int_mask, x_flag: self.x_flag, v_flag: self.v_flag, c_flag: self.c_flag, n_flag: self.n_flag, not_z_flag: self.not_z_flag,
+            fc_is_data: false,
         }
     }
 }
@@ -1018,11 +1062,12 @@ mod tests {
 
         let val = cpu.read_imm_u16().unwrap();
         assert_eq!((2<<8)+(1<<0), val);
-        assert_eq!(Operation::ReadLong(SUPERVISOR_PROGRAM, base, 0x02010304), cpu.mem.logger.ops()[0]);
+        assert_eq!(Operation::ReadWord(SUPERVISOR_PROGRAM, base, 0x0201), cpu.mem.logger.ops()[0]);
+        assert_eq!(Operation::ReadWord(SUPERVISOR_PROGRAM, base + 2, 0x0304), cpu.mem.logger.ops()[1]);
     }
 
     #[test]
-    fn an_user_mode_read_imm_u16_is_reflected_in_mem_ops() {
+    fn a_user_mode_read_imm_u16_is_reflected_in_mem_ops() {
         let base = 128;
         let mut cpu = TestCore::new_mem(base, &[2u8, 1u8, 3u8, 4u8]);
         cpu.s_flag = 0;
@@ -1030,7 +1075,8 @@ mod tests {
 
         let val = cpu.read_imm_u16().unwrap();
         assert_eq!((2<<8)+(1<<0), val);
-        assert_eq!(Operation::ReadLong(USER_PROGRAM, base, 0x02010304), cpu.mem.logger.ops()[0]);
+        assert_eq!(Operation::ReadWord(USER_PROGRAM, base, 0x0201), cpu.mem.logger.ops()[0]);
+        assert_eq!(Operation::ReadWord(USER_PROGRAM, base + 2, 0x0304), cpu.mem.logger.ops()[1]);
     }
 
     #[test]
@@ -1040,7 +1086,8 @@ mod tests {
         assert_eq!(256, cpu.dar[15]);
         assert_eq!(128, cpu.pc);
         assert_eq!("-S7-----", cpu.flags());
-        assert_eq!(Operation::ReadLong(SUPERVISOR_PROGRAM, 0, 0x100), cpu.mem.logger.ops()[0]);
+        assert_eq!(Operation::ReadWord(SUPERVISOR_PROGRAM, 0, 0), cpu.mem.logger.ops()[0]);
+        assert_eq!(Operation::ReadWord(SUPERVISOR_PROGRAM, 2, 0x100), cpu.mem.logger.ops()[1]);
     }
 
     #[test]

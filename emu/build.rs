@@ -59,4 +59,5 @@ fn main() {
             Err(e) => panic!("Compiling m68kmake failed!: {}", e.to_string()),
         }
     }
+    println!("cargo:rerun-if-changed={}", musashi_dir.to_str().unwrap());
 }
