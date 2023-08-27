@@ -1608,7 +1608,8 @@ macro_rules! impl_move {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let src = operator::$src(core)?;
             let ea = effective_address::$dst(core)?;
-            core.write_fc_long(ea, src)?;
+            core.write_fc_word(ea.wrapping_add(2), src & 0xffff)?;
+            core.write_fc_word(ea, src >> 16)?;
             common::move_flags(core, src, 24);
             Ok(Cycles($cycles))
         });
