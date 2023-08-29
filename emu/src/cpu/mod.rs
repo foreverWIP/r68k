@@ -26,24 +26,24 @@ pub trait Core {
     fn not_z_flag(&mut self) -> &mut u32;
     fn x_flag_as_1(&self) -> u32;
     fn dar(&mut self) -> &mut [u32; 16];
+    fn read_byte(&mut self, address: u32) -> Result<u32>;
+    fn read_word(&mut self, address: u32) -> Result<u32>;
+    fn read_long(&mut self, address: u32) -> Result<u32>;
     fn read_data_byte(&mut self, address: u32) -> Result<u32>;
     fn read_data_word(&mut self, address: u32) -> Result<u32>;
     fn read_data_long(&mut self, address: u32) -> Result<u32>;
     fn read_program_byte(&mut self, address: u32) -> Result<u32>;
     fn read_program_word(&mut self, address: u32) -> Result<u32>;
     fn read_program_long(&mut self, address: u32) -> Result<u32>;
-    fn read_fc_byte(&mut self, address: u32) -> Result<u32>;
-    fn read_fc_word(&mut self, address: u32) -> Result<u32>;
-    fn read_fc_long(&mut self, address: u32) -> Result<u32>;
+    fn write_byte(&mut self, address: u32, value: u32) -> Result<()>;
+    fn write_word(&mut self, address: u32, value: u32) -> Result<()>;
+    fn write_long(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_data_byte(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_data_word(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_data_long(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_program_byte(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_program_word(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_program_long(&mut self, address: u32, value: u32) -> Result<()>;
-    fn write_fc_byte(&mut self, address: u32, value: u32) -> Result<()>;
-    fn write_fc_word(&mut self, address: u32, value: u32) -> Result<()>;
-    fn write_fc_long(&mut self, address: u32, value: u32) -> Result<()>;
     fn is_fc_data(&self) -> bool;
     fn set_fc(&mut self, is_data: bool);
     fn status_register(&self) -> u16;
@@ -154,6 +154,27 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
     fn x_flag_as_1(&self) -> u32 {
         self.x_flag_as_1()
     }
+    fn read_byte(&mut self, address: u32) -> Result<u32> {
+        if self.fc_is_data {
+            self.read_data_byte(address)
+        } else {
+            self.read_program_byte(address)
+        }
+    }
+    fn read_word(&mut self, address: u32) -> Result<u32> {
+        if self.fc_is_data {
+            self.read_data_word(address)
+        } else {
+            self.read_program_word(address)
+        }
+    }
+    fn read_long(&mut self, address: u32) -> Result<u32> {
+        if self.fc_is_data {
+            self.read_data_long(address)
+        } else {
+            self.read_program_long(address)
+        }
+    }
     fn read_data_byte(&mut self, address: u32) -> Result<u32> {
         self.read_data_byte(address)
     }
@@ -172,26 +193,14 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
     fn read_program_long(&mut self, address: u32) -> Result<u32> {
         self.read_program_long(address)
     }
-    fn read_fc_byte(&mut self, address: u32) -> Result<u32> {
-        if self.fc_is_data {
-            self.read_data_byte(address)
-        } else {
-            self.read_program_byte(address)
-        }
+    fn write_byte(&mut self, address: u32, value: u32) -> Result<()> {
+        self.write_data_byte(address, value)
     }
-    fn read_fc_word(&mut self, address: u32) -> Result<u32> {
-        if self.fc_is_data {
-            self.read_data_word(address)
-        } else {
-            self.read_program_word(address)
-        }
+    fn write_word(&mut self, address: u32, value: u32) -> Result<()> {
+        self.write_data_word(address, value)
     }
-    fn read_fc_long(&mut self, address: u32) -> Result<u32> {
-        if self.fc_is_data {
-            self.read_data_long(address)
-        } else {
-            self.read_program_long(address)
-        }
+    fn write_long(&mut self, address: u32, value: u32) -> Result<()> {
+        self.write_data_long(address, value)
     }
     fn write_data_byte(&mut self, address: u32, value: u32) -> Result<()> {
         self.write_data_byte(address, value)
@@ -210,27 +219,6 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
     }
     fn write_program_long(&mut self, address: u32, value: u32) -> Result<()> {
         self.write_program_long(address, value)
-    }
-    fn write_fc_byte(&mut self, address: u32, value: u32) -> Result<()> {
-        if self.fc_is_data {
-            self.write_data_byte(address, value)
-        } else {
-            self.write_program_byte(address, value)
-        }
-    }
-    fn write_fc_word(&mut self, address: u32, value: u32) -> Result<()> {
-        if self.fc_is_data {
-            self.write_data_word(address, value)
-        } else {
-            self.write_program_word(address, value)
-        }
-    }
-    fn write_fc_long(&mut self, address: u32, value: u32) -> Result<()> {
-        if self.fc_is_data {
-            self.write_data_long(address, value)
-        } else {
-            self.write_program_long(address, value)
-        }
     }
     fn is_fc_data(&self) -> bool {
         self.fc_is_data
@@ -659,24 +647,24 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     }
     pub fn read_imm_u32(&mut self) -> Result<u32> {
         self.set_fc(false);
-        let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
+        let address_space = AddressSpace::from_flags(self.s_flag != 0, self.fc_is_data);
         if self.pc & 1 > 0 {
             return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
         let mut temp_val = 0u32;
         if self.pc != self.prefetch_addr {
             self.prefetch_addr = self.pc;
-            self.prefetch_data = self.mem.read_word(address_space, self.prefetch_addr & ADDRBUS_MASK);
+            self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
         }
         temp_val = self.prefetch_data & 0xffff;
         self.pc += 2;
         self.prefetch_addr = self.pc;
-        self.prefetch_data = self.mem.read_word(address_space, self.prefetch_addr & ADDRBUS_MASK);
+        self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
 
         temp_val = (temp_val << 16) | (self.prefetch_data & 0xffff);
         self.pc += 2;
         self.prefetch_addr = self.pc;
-        self.prefetch_data = self.mem.read_word(address_space, self.prefetch_addr & ADDRBUS_MASK);
+        self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
 
         Ok(temp_val)
     }
@@ -688,70 +676,74 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     }
     pub fn read_imm_u16(&mut self) -> Result<u16> {
         self.set_fc(false);
-        let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
+        let address_space = AddressSpace::from_flags(self.s_flag != 0, self.fc_is_data);
         if self.pc & 1 > 0 {
             return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
         let mut result = 0u32;
         if self.pc != self.prefetch_addr {
             self.prefetch_addr = self.pc;
-            self.prefetch_data = self.mem.read_word(address_space, self.prefetch_addr & ADDRBUS_MASK);
+            self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
         }
         result = self.prefetch_data & 0xffff;
         self.pc += 2;
         self.prefetch_addr = self.pc;
-        self.prefetch_data = self.mem.read_word(address_space, self.prefetch_addr & ADDRBUS_MASK);
+        self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
         Ok(result as u16)
     }
     pub fn push_sp(&mut self) -> u32 {
          let new_sp = (Wrapping(self.dar[15]) - Wrapping(4)).0;
          self.dar[15] = new_sp;
-         self.write_fc_long(new_sp, new_sp).unwrap();
+         self.write_long(new_sp, new_sp).unwrap();
          new_sp
     }
     pub fn push_32(&mut self, value: u32) -> u32 {
          let new_sp = (Wrapping(self.dar[15]) - Wrapping(4)).0;
          self.dar[15] = new_sp;
-         self.write_fc_long(new_sp, value).unwrap();
+         self.write_long(new_sp, value).unwrap();
          new_sp
     }
     pub fn pop_32(&mut self) -> u32 {
         let sp = self.dar[15];
-        let data = self.read_fc_long(sp).unwrap();
+        let data = self.read_long(sp).unwrap();
         self.dar[15] = sp.wrapping_add(4);
         data
     }
     pub fn push_16(&mut self, value: u16) -> u32 {
          let new_sp = (Wrapping(self.dar[15]) - Wrapping(2)).0;
          self.dar[15] = new_sp;
-         self.write_program_word(new_sp, u32::from(value)).unwrap();
+         self.write_word(new_sp, u32::from(value)).unwrap();
          new_sp
     }
     pub fn pop_16(&mut self) -> u16 {
         let sp = self.dar[15];
-        let data = self.read_program_word(sp).unwrap() as u16;
+        let data = self.read_word(sp).unwrap() as u16;
         self.dar[15] = sp.wrapping_add(2);
         data
     }
     pub fn read_data_byte(&mut self, address: u32) -> Result<u32> {
+        self.set_fc(true);
         let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         Ok(self.mem.read_byte(address_space, address))
     }
     pub fn read_program_byte(&mut self, address: u32) -> Result<u32> {
+        self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         Ok(self.mem.read_byte(address_space, address))
     }
     pub fn write_data_byte(&mut self, address: u32, value: u32) -> Result<()> {
-        let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
-        self.mem.write_byte(address_space, address, value);
+        self.set_fc(true);
+        self.mem.write_byte(if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA}, address, value);
         Ok(())
     }
     pub fn write_program_byte(&mut self, address: u32, value: u32) -> Result<()> {
+        self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         self.mem.write_byte(address_space, address, value);
         Ok(())
     }
     pub fn read_data_word(&mut self, address: u32) -> Result<u32> {
+        self.set_fc(true);
         let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
             Err(Exception::AddressError{address, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
@@ -760,6 +752,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn read_program_word(&mut self, address: u32) -> Result<u32> {
+        self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
             // println!("{}", std::backtrace::Backtrace::force_capture());
@@ -769,6 +762,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn write_data_word(&mut self, address: u32, value: u32) -> Result<()> {
+        self.set_fc(true);
         let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
             Err(Exception::AddressError{address, access_type: AccessType::Write, address_space, processing_state: self.processing_state})
@@ -778,6 +772,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn write_program_word(&mut self, address: u32, value: u32) -> Result<()> {
+        self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
             Err(Exception::AddressError{address, access_type: AccessType::Write, address_space, processing_state: self.processing_state})
@@ -787,6 +782,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn read_data_long(&mut self, address: u32) -> Result<u32> {
+        self.set_fc(true);
         let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
             Err(Exception::AddressError{address, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
@@ -795,6 +791,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn read_program_long(&mut self, address: u32) -> Result<u32> {
+        self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
             Err(Exception::AddressError{address, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
@@ -803,6 +800,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn write_data_long(&mut self, address: u32, value: u32) -> Result<()> {
+        self.set_fc(true);
         let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
             Err(Exception::AddressError{address, access_type: AccessType::Write, address_space, processing_state: self.processing_state})
@@ -812,6 +810,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn write_program_long(&mut self, address: u32, value: u32) -> Result<()> {
+        self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
             Err(Exception::AddressError{address, access_type: AccessType::Write, address_space, processing_state: self.processing_state})
@@ -825,7 +824,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     }
     pub fn jump_vector(&mut self, vector: u8) {
         let vector_address = u32::from(vector) << 2;
-        self.pc = self.read_fc_long(vector_address).unwrap();
+        self.pc = self.read_long(vector_address).unwrap();
     }
     pub fn ensure_supervisor_mode(&mut self) -> u16 {
         let backup_sr = self.status_register();
@@ -860,7 +859,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
          */
         let access_info = match access_type {AccessType::Read => 0b10000, _ => 0 } |
             if processing_state.instruction_processing() { 0 } else { 0b01000 } |
-            ((if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA}).fc() as u16);
+            (address_space.fc() as u16);
         self.push_16(access_info);
         self.jump_vector(EXCEPTION_ADDRESS_ERROR);
         Cycles(50)
@@ -962,6 +961,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
                     // Call instruction handler to mutate Core accordingly
                     self.instruction_set[opcode as usize](self)
                 });
+            self.set_fc(true);
             remaining_cycles = remaining_cycles - match result {
                 Ok(cycles_used) => cycles_used,
                 Err(ex) => {

@@ -503,7 +503,6 @@ fn generate_optable<T: Core>() -> Vec<OpcodeHandler<T>> {
         op_entry!(MASK_EXACT,   OP_BTST_8_S_AL, btst_8_s_al),
         op_entry!(MASK_EXACT,   OP_BTST_8_S_PCDI, btst_8_s_pcdi),
         op_entry!(MASK_EXACT,   OP_BTST_8_S_PCIX, btst_8_s_pcix),
-        op_entry!(MASK_EXACT,   OP_BTST_8_S_IMM, btst_8_s_imm),
 
         op_entry!(MASK_OUT_X_Y, OP_CHK_16_AI,   chk_16_ai),
         op_entry!(MASK_OUT_X,   OP_CHK_16_AL,   chk_16_al),

@@ -17,6 +17,23 @@ impl AddressSpace {
             SUPERVISOR_PROGRAM => 6,
         }
     }
+    pub fn from_flags(s_flag: bool, fc_is_data: bool) -> Self {
+        match (s_flag, fc_is_data) {
+            (true, true) => SUPERVISOR_DATA,
+            (true, false) => SUPERVISOR_PROGRAM,
+            (false, true) => USER_DATA,
+            (false, false) => USER_PROGRAM,
+        }
+    }
+    pub fn from_musashi(value: u32) -> Self {
+        match value & 0b111 {
+            0b001 => USER_DATA,
+            0b010 => USER_PROGRAM,
+            0b101 => SUPERVISOR_DATA,
+            0b110 => SUPERVISOR_PROGRAM,
+            _ => panic!("unknown fc: {}", value),
+        }
+    }
 }
 use std::fmt;
 impl fmt::Debug for AddressSpace {

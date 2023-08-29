@@ -111,7 +111,7 @@ macro_rules! impl_op {
             let src = operator::$src(core)?;
             let (dst, ea) = operator::$dst(core)?;
             let res = common::$common(core, dst, src);
-            core.write_fc_byte(ea, mask_out_below_8!(dst) | res)?;
+            core.write_byte(ea, mask_out_below_8!(dst) | res)?;
             Ok(Cycles($cycles))
         });
     (16, $common:ident, $name:ident, $src:ident, $dst:ident, $cycles:expr) => (
@@ -119,7 +119,7 @@ macro_rules! impl_op {
             let src = operator::$src(core)?;
             let (dst, ea) = operator::$dst(core)?;
             let res = common::$common(core, dst, src);
-            core.write_program_word(ea, mask_out_below_16!(dst) | res)?;
+            core.write_word(ea, mask_out_below_16!(dst) | res)?;
             Ok(Cycles($cycles))
         });
     (32, $common:ident, $name:ident, $src:ident, $dst:ident, $cycles:expr) => (
@@ -127,7 +127,7 @@ macro_rules! impl_op {
             let src = operator::$src(core)?;
             let (dst, ea) = operator::$dst(core)?;
             let res = common::$common(core, dst, src);
-            core.write_fc_long(ea, res)?;
+            core.write_long(ea, res)?;
             Ok(Cycles($cycles))
         })
 }
@@ -145,7 +145,7 @@ macro_rules! impl_shift_op {
             let shift = 1;
             let (dst, ea) = operator::$dst(core)?;
             let res = common::$common(core, dst, shift);
-            core.write_program_word(ea, mask_out_below_16!(dst) | res)?;
+            core.write_word(ea, mask_out_below_16!(dst) | res)?;
             Ok(Cycles($cycles))
         });
     (16, $common:ident, $name:ident, $shift_src:ident, dy, $cycles:expr) => (
@@ -761,7 +761,7 @@ macro_rules! bchg_8 {
             let (dst, ea) = operator::$dst(core)?;
             let mask = 1 << src;
             not_z_flag!(core) = dst & mask;
-            core.write_fc_byte(ea, dst ^ mask)?;
+            core.write_byte(ea, dst ^ mask)?;
             Ok(Cycles($cycles))
         });
 }
@@ -773,7 +773,7 @@ macro_rules! bclr_8 {
             let (dst, ea) = operator::$dst(core)?;
             let mask = 1 << src;
             not_z_flag!(core) = dst & mask;
-            core.write_fc_byte(ea, dst & !mask)?;
+            core.write_byte(ea, dst & !mask)?;
             Ok(Cycles($cycles))
         });
 }
@@ -785,7 +785,7 @@ macro_rules! bset_8 {
             let (dst, ea) = operator::$dst(core)?;
             let mask = 1 << src;
             not_z_flag!(core) = dst & mask;
-            core.write_fc_byte(ea, dst | mask)?;
+            core.write_byte(ea, dst | mask)?;
             Ok(Cycles($cycles))
         });
 }
@@ -945,7 +945,7 @@ btst_8!(btst_8_s_aw,   imm_8, aw_8,    8+8 );
 btst_8!(btst_8_s_al,   imm_8, al_8,    8+12);
 btst_8!(btst_8_s_pcdi, imm_8, pcdi_8,  8+8);
 btst_8!(btst_8_s_pcix, imm_8, pcix_8,  8+10);
-btst_8!(btst_8_s_imm,  imm_8, imm_8,   8+4);
+// btst_8!(btst_8_s_imm,  imm_8, imm_8,   8+4); // not present
 
 pub fn bra_8<T: Core>(core: &mut T) -> Result<Cycles> {
     let offset = mask_out_above_8!(ir!(core)) as i8;
@@ -1038,13 +1038,13 @@ pub fn clr_8_dn<T: Core>(core: &mut T) -> Result<Cycles> {
     not_z_flag!(core) = 0;
     Ok(Cycles(4))
 }
-clr!(clr_8_ai, address_indirect_ay, write_program_byte, 8+4);
-clr!(clr_8_pi, postincrement_ay_8,  write_program_byte, 8+4);
-clr!(clr_8_pd, predecrement_ay_8,   write_program_byte, 8+6);
-clr!(clr_8_di, displacement_ay,     write_program_byte, 8+8);
-clr!(clr_8_ix, index_ay,            write_program_byte, 8+10);
-clr!(clr_8_aw, absolute_word,       write_program_byte, 8+8);
-clr!(clr_8_al, absolute_long,       write_program_byte, 8+12);
+clr!(clr_8_ai, address_indirect_ay, write_byte, 8+4);
+clr!(clr_8_pi, postincrement_ay_8,  write_byte, 8+4);
+clr!(clr_8_pd, predecrement_ay_8,   write_byte, 8+6);
+clr!(clr_8_di, displacement_ay,     write_byte, 8+8);
+clr!(clr_8_ix, index_ay,            write_byte, 8+10);
+clr!(clr_8_aw, absolute_word,       write_byte, 8+8);
+clr!(clr_8_al, absolute_long,       write_byte, 8+12);
 
 pub fn clr_16_dn<T: Core>(core: &mut T) -> Result<Cycles> {
     dy!(core) &= 0xffff_0000;
@@ -1055,13 +1055,13 @@ pub fn clr_16_dn<T: Core>(core: &mut T) -> Result<Cycles> {
     not_z_flag!(core) = 0;
     Ok(Cycles(4))
 }
-clr!(clr_16_ai, address_indirect_ay, write_program_word, 8+4);
-clr!(clr_16_pi, postincrement_ay_16, write_program_word, 8+4);
-clr!(clr_16_pd, predecrement_ay_16,  write_program_word, 8+6);
-clr!(clr_16_di, displacement_ay,     write_program_word, 8+8);
-clr!(clr_16_ix, index_ay,            write_program_word, 8+10);
-clr!(clr_16_aw, absolute_word,       write_program_word, 8+8);
-clr!(clr_16_al, absolute_long,       write_program_word, 8+12);
+clr!(clr_16_ai, address_indirect_ay, write_word, 8+4);
+clr!(clr_16_pi, postincrement_ay_16, write_word, 8+4);
+clr!(clr_16_pd, predecrement_ay_16,  write_word, 8+6);
+clr!(clr_16_di, displacement_ay,     write_word, 8+8);
+clr!(clr_16_ix, index_ay,            write_word, 8+10);
+clr!(clr_16_aw, absolute_word,       write_word, 8+8);
+clr!(clr_16_al, absolute_long,       write_word, 8+12);
 
 pub fn clr_32_dn<T: Core>(core: &mut T) -> Result<Cycles> {
     dy!(core) = 0;
@@ -1072,13 +1072,13 @@ pub fn clr_32_dn<T: Core>(core: &mut T) -> Result<Cycles> {
     not_z_flag!(core) = 0;
     Ok(Cycles(6))
 }
-clr!(clr_32_ai, address_indirect_ay, write_fc_long, 12+8);
-clr!(clr_32_pi, postincrement_ay_32, write_fc_long, 12+8);
-clr!(clr_32_pd, predecrement_ay_32,  write_fc_long, 12+10);
-clr!(clr_32_di, displacement_ay,     write_fc_long, 12+12);
-clr!(clr_32_ix, index_ay,            write_fc_long, 12+14);
-clr!(clr_32_aw, absolute_word,       write_fc_long, 12+12);
-clr!(clr_32_al, absolute_long,       write_fc_long, 12+16);
+clr!(clr_32_ai, address_indirect_ay, write_long, 12+8);
+clr!(clr_32_pi, postincrement_ay_32, write_long, 12+8);
+clr!(clr_32_pd, predecrement_ay_32,  write_long, 12+10);
+clr!(clr_32_di, displacement_ay,     write_long, 12+12);
+clr!(clr_32_ix, index_ay,            write_long, 12+14);
+clr!(clr_32_aw, absolute_word,       write_long, 12+12);
+clr!(clr_32_al, absolute_long,       write_long, 12+16);
 
 impl_op!(-, cmp_8, cmp_8_dn,   dy,      dx, 4+0);
 impl_op!(-, cmp_8, cmp_8_ai,   ay_ai_8, dx, 4+4);
@@ -1584,7 +1584,7 @@ macro_rules! impl_move {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let src = mask_out_above_8!(operator::$src(core)?);
             let ea = effective_address::$dst(core)?;
-            core.write_fc_byte(ea, src)?;
+            core.write_byte(ea, src)?;
             common::move_flags(core, src, 0);
             Ok(Cycles($cycles))
         });
@@ -1599,7 +1599,7 @@ macro_rules! impl_move {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let src = mask_out_above_16!(operator::$src(core)?);
             let ea = effective_address::$dst(core)?;
-            core.write_program_word(ea, src)?;
+            core.write_word(ea, src)?;
             common::move_flags(core, src, 8);
             Ok(Cycles($cycles))
         });
@@ -1614,8 +1614,18 @@ macro_rules! impl_move {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let src = operator::$src(core)?;
             let ea = effective_address::$dst(core)?;
-            core.write_fc_word(ea.wrapping_add(2), src & 0xffff)?;
-            core.write_fc_word(ea, src >> 16)?;
+            core.write_long(ea, src)?;
+            common::move_flags(core, src, 24);
+            Ok(Cycles($cycles))
+        });
+}
+macro_rules! impl_move_32_pd {
+    (32, $name:ident, $dst:ident, $src:ident, $cycles:expr) => (
+        pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
+            let src = operator::$src(core)?;
+            let ea = effective_address::$dst(core)?;
+            core.write_word(ea + 2, src & 0xffff)?;
+            core.write_word(ea, src >> 16)?;
             common::move_flags(core, src, 24);
             Ok(Cycles($cycles))
         });
@@ -1831,7 +1841,7 @@ impl_move!(16, move_16_al_imm, absolute_long, imm_16, 16+4);
 impl_move!(32, move_32_dn_dn, dx, dy, 4);
 impl_move!(32, move_32_ai_dn, address_indirect_ax, dy, 12);
 impl_move!(32, move_32_pi_dn, postincrement_ax_32, dy, 12);
-impl_move!(32, move_32_pd_dn, predecrement_ax_32, dy, 12);
+impl_move_32_pd!(32, move_32_pd_dn, predecrement_ax_32, dy, 12);
 impl_move!(32, move_32_di_dn, displacement_ax, dy, 16);
 impl_move!(32, move_32_ix_dn, index_ax, dy, 18);
 impl_move!(32, move_32_aw_dn, absolute_word, dy, 16);
@@ -1840,7 +1850,7 @@ impl_move!(32, move_32_al_dn, absolute_long, dy, 20);
 impl_move!(32, move_32_dn_an, dx, ay, 4);
 impl_move!(32, move_32_ai_an, address_indirect_ax, ay, 12);
 impl_move!(32, move_32_pi_an, postincrement_ax_32, ay, 12);
-impl_move!(32, move_32_pd_an, predecrement_ax_32, ay, 12);
+impl_move_32_pd!(32, move_32_pd_an, predecrement_ax_32, ay, 12);
 impl_move!(32, move_32_di_an, displacement_ax, ay, 16);
 impl_move!(32, move_32_ix_an, index_ax, ay, 18);
 impl_move!(32, move_32_aw_an, absolute_word, ay, 16);
@@ -1849,7 +1859,7 @@ impl_move!(32, move_32_al_an, absolute_long, ay, 20);
 impl_move!(32, move_32_dn_ai, dx, ay_ai_32, 4+8);
 impl_move!(32, move_32_ai_ai, address_indirect_ax, ay_ai_32, 12+8);
 impl_move!(32, move_32_pi_ai, postincrement_ax_32, ay_ai_32, 12+8);
-impl_move!(32, move_32_pd_ai, predecrement_ax_32, ay_ai_32, 12+8);
+impl_move_32_pd!(32, move_32_pd_ai, predecrement_ax_32, ay_ai_32, 12+8);
 impl_move!(32, move_32_di_ai, displacement_ax, ay_ai_32, 16+8);
 impl_move!(32, move_32_ix_ai, index_ax, ay_ai_32, 18+8);
 impl_move!(32, move_32_aw_ai, absolute_word, ay_ai_32, 16+8);
@@ -1858,7 +1868,7 @@ impl_move!(32, move_32_al_ai, absolute_long, ay_ai_32, 20+8);
 impl_move!(32, move_32_dn_pi, dx, ay_pi_32, 4+8);
 impl_move!(32, move_32_ai_pi, address_indirect_ax, ay_pi_32, 12+8);
 impl_move!(32, move_32_pi_pi, postincrement_ax_32, ay_pi_32, 12+8);
-impl_move!(32, move_32_pd_pi, predecrement_ax_32, ay_pi_32, 12+8);
+impl_move_32_pd!(32, move_32_pd_pi, predecrement_ax_32, ay_pi_32, 12+8);
 impl_move!(32, move_32_di_pi, displacement_ax, ay_pi_32, 16+8);
 impl_move!(32, move_32_ix_pi, index_ax, ay_pi_32, 18+8);
 impl_move!(32, move_32_aw_pi, absolute_word, ay_pi_32, 16+8);
@@ -1867,7 +1877,7 @@ impl_move!(32, move_32_al_pi, absolute_long, ay_pi_32, 20+8);
 impl_move!(32, move_32_dn_pd, dx, ay_pd_32, 4+10);
 impl_move!(32, move_32_ai_pd, address_indirect_ax, ay_pd_32, 12+10);
 impl_move!(32, move_32_pi_pd, postincrement_ax_32, ay_pd_32, 12+10);
-impl_move!(32, move_32_pd_pd, predecrement_ax_32, ay_pd_32, 12+10);
+impl_move_32_pd!(32, move_32_pd_pd, predecrement_ax_32, ay_pd_32, 12+10);
 impl_move!(32, move_32_di_pd, displacement_ax, ay_pd_32, 16+10);
 impl_move!(32, move_32_ix_pd, index_ax, ay_pd_32, 18+10);
 impl_move!(32, move_32_aw_pd, absolute_word, ay_pd_32, 16+10);
@@ -1876,7 +1886,7 @@ impl_move!(32, move_32_al_pd, absolute_long, ay_pd_32, 20+10);
 impl_move!(32, move_32_dn_di, dx, ay_di_32, 4+12);
 impl_move!(32, move_32_ai_di, address_indirect_ax, ay_di_32, 12+12);
 impl_move!(32, move_32_pi_di, postincrement_ax_32, ay_di_32, 12+12);
-impl_move!(32, move_32_pd_di, predecrement_ax_32, ay_di_32, 12+12);
+impl_move_32_pd!(32, move_32_pd_di, predecrement_ax_32, ay_di_32, 12+12);
 impl_move!(32, move_32_di_di, displacement_ax, ay_di_32, 16+12);
 impl_move!(32, move_32_ix_di, index_ax, ay_di_32, 18+12);
 impl_move!(32, move_32_aw_di, absolute_word, ay_di_32, 16+12);
@@ -1885,7 +1895,7 @@ impl_move!(32, move_32_al_di, absolute_long, ay_di_32, 20+12);
 impl_move!(32, move_32_dn_ix, dx, ay_ix_32, 4+14);
 impl_move!(32, move_32_ai_ix, address_indirect_ax, ay_ix_32, 12+14);
 impl_move!(32, move_32_pi_ix, postincrement_ax_32, ay_ix_32, 12+14);
-impl_move!(32, move_32_pd_ix, predecrement_ax_32, ay_ix_32, 12+14);
+impl_move_32_pd!(32, move_32_pd_ix, predecrement_ax_32, ay_ix_32, 12+14);
 impl_move!(32, move_32_di_ix, displacement_ax, ay_ix_32, 16+14);
 impl_move!(32, move_32_ix_ix, index_ax, ay_ix_32, 18+14);
 impl_move!(32, move_32_aw_ix, absolute_word, ay_ix_32, 16+14);
@@ -1894,7 +1904,7 @@ impl_move!(32, move_32_al_ix, absolute_long, ay_ix_32, 20+14);
 impl_move!(32, move_32_dn_aw, dx, aw_32, 4+12);
 impl_move!(32, move_32_ai_aw, address_indirect_ax, aw_32, 12+12);
 impl_move!(32, move_32_pi_aw, postincrement_ax_32, aw_32, 12+12);
-impl_move!(32, move_32_pd_aw, predecrement_ax_32, aw_32, 12+12);
+impl_move_32_pd!(32, move_32_pd_aw, predecrement_ax_32, aw_32, 12+12);
 impl_move!(32, move_32_di_aw, displacement_ax, aw_32, 16+12);
 impl_move!(32, move_32_ix_aw, index_ax, aw_32, 18+12);
 impl_move!(32, move_32_aw_aw, absolute_word, aw_32, 16+12);
@@ -1903,7 +1913,7 @@ impl_move!(32, move_32_al_aw, absolute_long, aw_32, 20+12);
 impl_move!(32, move_32_dn_al, dx, al_32, 4+16);
 impl_move!(32, move_32_ai_al, address_indirect_ax, al_32, 12+16);
 impl_move!(32, move_32_pi_al, postincrement_ax_32, al_32, 12+16);
-impl_move!(32, move_32_pd_al, predecrement_ax_32, al_32, 12+16);
+impl_move_32_pd!(32, move_32_pd_al, predecrement_ax_32, al_32, 12+16);
 impl_move!(32, move_32_di_al, displacement_ax, al_32, 16+16);
 impl_move!(32, move_32_ix_al, index_ax, al_32, 18+16);
 impl_move!(32, move_32_aw_al, absolute_word, al_32, 16+16);
@@ -1912,7 +1922,7 @@ impl_move!(32, move_32_al_al, absolute_long, al_32, 20+16);
 impl_move!(32, move_32_dn_pcdi, dx, pcdi_32, 4+12);
 impl_move!(32, move_32_ai_pcdi, address_indirect_ax, pcdi_32, 12+12);
 impl_move!(32, move_32_pi_pcdi, postincrement_ax_32, pcdi_32, 12+12);
-impl_move!(32, move_32_pd_pcdi, predecrement_ax_32, pcdi_32, 12+12);
+impl_move_32_pd!(32, move_32_pd_pcdi, predecrement_ax_32, pcdi_32, 12+12);
 impl_move!(32, move_32_di_pcdi, displacement_ax, pcdi_32, 16+12);
 impl_move!(32, move_32_ix_pcdi, index_ax, pcdi_32, 18+12);
 impl_move!(32, move_32_aw_pcdi, absolute_word, pcdi_32, 16+12);
@@ -1921,7 +1931,7 @@ impl_move!(32, move_32_al_pcdi, absolute_long, pcdi_32, 20+12);
 impl_move!(32, move_32_dn_pcix, dx, pcix_32, 4+14);
 impl_move!(32, move_32_ai_pcix, address_indirect_ax, pcix_32, 12+14);
 impl_move!(32, move_32_pi_pcix, postincrement_ax_32, pcix_32, 12+14);
-impl_move!(32, move_32_pd_pcix, predecrement_ax_32, pcix_32, 12+14);
+impl_move_32_pd!(32, move_32_pd_pcix, predecrement_ax_32, pcix_32, 12+14);
 impl_move!(32, move_32_di_pcix, displacement_ax, pcix_32, 16+14);
 impl_move!(32, move_32_ix_pcix, index_ax, pcix_32, 18+14);
 impl_move!(32, move_32_aw_pcix, absolute_word, pcix_32, 16+14);
@@ -1930,7 +1940,7 @@ impl_move!(32, move_32_al_pcix, absolute_long, pcix_32, 20+14);
 impl_move!(32, move_32_dn_imm, dx, imm_32, 4+8);
 impl_move!(32, move_32_ai_imm, address_indirect_ax, imm_32, 12+8);
 impl_move!(32, move_32_pi_imm, postincrement_ax_32, imm_32, 12+8);
-impl_move!(32, move_32_pd_imm, predecrement_ax_32, imm_32, 12+8);
+impl_move_32_pd!(32, move_32_pd_imm, predecrement_ax_32, imm_32, 12+8);
 impl_move!(32, move_32_di_imm, displacement_ax, imm_32, 16+8);
 impl_move!(32, move_32_ix_imm, index_ax, imm_32, 18+8);
 impl_move!(32, move_32_aw_imm, absolute_word, imm_32, 16+8);
@@ -2016,7 +2026,7 @@ macro_rules! move_frs {
   // return;
             let sr = core.status_register();
             let ea = effective_address::$src(core)?;
-            core.write_program_word(ea, u32::from(sr))?;
+            core.write_word(ea, u32::from(sr))?;
             Ok(Cycles($cycles))
         })
 }
@@ -2082,7 +2092,7 @@ macro_rules! movem_16_re {
                 if registers & (1 << i) > 0 {
                     ea = ea.wrapping_sub(2);
                     let reg_word = dar!(core)[15-i] & 0xffff;
-                    core.write_program_word(ea, reg_word)?;
+                    core.write_word(ea, reg_word)?;
                     moves += 1;
                 }
             }
@@ -2097,7 +2107,7 @@ macro_rules! movem_16_re {
             for i in 0..16 {
                 if registers & (1 << i) > 0 {
                     let reg_word = dar!(core)[i] & 0xffff;
-                    core.write_program_word(ea, reg_word)?;
+                    core.write_word(ea, reg_word)?;
                     ea = ea.wrapping_add(2);
                     moves += 1;
                 }
@@ -2106,7 +2116,7 @@ macro_rules! movem_16_re {
         })
 }
 macro_rules! movem_16_er {
-    ($name:ident, $src:ident, pc, $cycles:expr) => (movem_16_er!($name, $src, read_program_word, $cycles););
+    ($name:ident, $src:ident, pc, $cycles:expr) => (movem_16_er!($name, $src, read_word, $cycles););
     ($name:ident, postincrement_ay_16, $cycles:expr) => (
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let registers = operator::imm_16(core)?;
@@ -2114,7 +2124,7 @@ macro_rules! movem_16_er {
             let mut moves = 0;
             for i in 0..16 {
                 if registers & (1 << i) > 0 {
-                    dar!(core)[i] = core.read_program_word(ea)? as i16 as u32;
+                    dar!(core)[i] = core.read_word(ea)? as i16 as u32;
                     ea = ea.wrapping_add(2);
                     moves += 1;
                 }
@@ -2122,7 +2132,7 @@ macro_rules! movem_16_er {
             ay!(core) = ea;
             Ok(Cycles($cycles + 4 * moves))
         });
-    ($name:ident, $src:ident, $cycles:expr) => (movem_16_er!($name, $src, read_program_word, $cycles););
+    ($name:ident, $src:ident, $cycles:expr) => (movem_16_er!($name, $src, read_word, $cycles););
     ($name:ident, $src:ident, $read_word:ident, $cycles:expr) => (
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let registers = operator::imm_16(core)?;
@@ -2148,7 +2158,7 @@ macro_rules! movem_32_re {
                 if registers & (1 << i) > 0 {
                     ea = ea.wrapping_sub(4);
                     let reg = dar!(core)[15-i];
-                    core.write_fc_long(ea, reg)?;
+                    core.write_long(ea, reg)?;
                     moves += 1;
                 }
             }
@@ -2163,7 +2173,7 @@ macro_rules! movem_32_re {
             for i in 0..16 {
                 if registers & (1 << i) > 0 {
                     let reg = dar!(core)[i];
-                    core.write_fc_long(ea, reg)?;
+                    core.write_long(ea, reg)?;
                     ea = ea.wrapping_add(4);
                     moves += 1;
                 }
@@ -2172,7 +2182,7 @@ macro_rules! movem_32_re {
         })
 }
 macro_rules! movem_32_er {
-    ($name:ident, $src:ident, pc, $cycles:expr) => (movem_32_er!($name, $src, read_program_long, $cycles););
+    ($name:ident, $src:ident, pc, $cycles:expr) => (movem_32_er!($name, $src, read_long, $cycles););
     ($name:ident, postincrement_ay_32, $cycles:expr) => (
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let registers = operator::imm_16(core)?;
@@ -2180,7 +2190,7 @@ macro_rules! movem_32_er {
             let mut moves = 0;
             for i in 0..16 {
                 if registers & (1 << i) > 0 {
-                    dar!(core)[i] = core.read_fc_long(ea)?;
+                    dar!(core)[i] = core.read_long(ea)?;
                     ea = ea.wrapping_add(4);
                     moves += 1;
                 }
@@ -2188,7 +2198,7 @@ macro_rules! movem_32_er {
             ay!(core) = ea;
             Ok(Cycles($cycles + 8 * moves))
         });
-    ($name:ident, $src:ident, $cycles:expr) => (movem_32_er!($name, $src, read_fc_long, $cycles););
+    ($name:ident, $src:ident, $cycles:expr) => (movem_32_er!($name, $src, read_long, $cycles););
     ($name:ident, $src:ident, $read_long:ident, $cycles:expr) => (
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let registers = operator::imm_16(core)?;
@@ -2238,32 +2248,32 @@ movem_32_er!(movem_32_er_pcix, index_pc, pc, 18);
 pub fn movep_16_er<T: Core>(core: &mut T) -> Result<Cycles> {
     let ea = effective_address::displacement_ay(core)?;
     dx!(core) = mask_out_below_16!(dx!(core))
-    | core.read_fc_byte(ea)? << 8
-    | core.read_fc_byte(ea.wrapping_add(2))?;
+    | core.read_byte(ea)? << 8
+    | core.read_byte(ea.wrapping_add(2))?;
     Ok(Cycles(16))
 }
 pub fn movep_16_re<T: Core>(core: &mut T) -> Result<Cycles> {
     let ea = effective_address::displacement_ay(core)?;
     let data = mask_out_above_16!(dx!(core));
-    core.write_fc_byte(ea, mask_out_above_8!(data >> 8))?;
-    core.write_fc_byte(ea.wrapping_add(2), mask_out_above_8!(data))?;
+    core.write_byte(ea, mask_out_above_8!(data >> 8))?;
+    core.write_byte(ea.wrapping_add(2), mask_out_above_8!(data))?;
     Ok(Cycles(16))
 }
 pub fn movep_32_er<T: Core>(core: &mut T) -> Result<Cycles> {
     let ea = effective_address::displacement_ay(core)?;
-    dx!(core) = core.read_fc_byte(ea)? << 24
-              | core.read_fc_byte(ea.wrapping_add(2))? << 16
-              | core.read_fc_byte(ea.wrapping_add(4))? << 8
-              | core.read_fc_byte(ea.wrapping_add(6))?;
+    dx!(core) = core.read_byte(ea)? << 24
+              | core.read_byte(ea.wrapping_add(2))? << 16
+              | core.read_byte(ea.wrapping_add(4))? << 8
+              | core.read_byte(ea.wrapping_add(6))?;
     Ok(Cycles(24))
 }
 pub fn movep_32_re<T: Core>(core: &mut T) -> Result<Cycles> {
     let ea = effective_address::displacement_ay(core)?;
     let data = dx!(core);
-    core.write_fc_byte(ea, mask_out_above_8!(data >> 24))?;
-    core.write_fc_byte(ea.wrapping_add(2), mask_out_above_8!(data >> 16))?;
-    core.write_fc_byte(ea.wrapping_add(4), mask_out_above_8!(data >> 8))?;
-    core.write_fc_byte(ea.wrapping_add(6), mask_out_above_8!(data))?;
+    core.write_byte(ea, mask_out_above_8!(data >> 24))?;
+    core.write_byte(ea.wrapping_add(2), mask_out_above_8!(data >> 16))?;
+    core.write_byte(ea.wrapping_add(4), mask_out_above_8!(data >> 8))?;
+    core.write_byte(ea.wrapping_add(6), mask_out_above_8!(data))?;
     Ok(Cycles(24))
 }
 
@@ -2335,7 +2345,7 @@ macro_rules! nbcd {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let (dst, ea) = operator::$dst(core)?;
             if let Some(res) = common::nbcd(core, dst) {
-                core.write_fc_byte(ea, res)?;
+                core.write_byte(ea, res)?;
             }
             Ok(Cycles($cycles))
         })
@@ -2362,7 +2372,7 @@ macro_rules! negop_8 {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let (dst, ea) = operator::$dst(core)?;
             let res = common::$common(core, 0, dst);
-            core.write_fc_byte(ea, mask_out_above_8!(res))?;
+            core.write_byte(ea, mask_out_above_8!(res))?;
             Ok(Cycles($cycles))
         });
 }
@@ -2378,7 +2388,7 @@ macro_rules! negop_16 {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let (dst, ea) = operator::$dst(core)?;
             let res = common::$common(core, 0, dst);
-            core.write_program_word(ea, mask_out_above_16!(res))?;
+            core.write_word(ea, mask_out_above_16!(res))?;
             Ok(Cycles($cycles))
         });
 }
@@ -2394,7 +2404,7 @@ macro_rules! negop_32 {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let (dst, ea) = operator::$dst(core)?;
             let res = common::$common(core, 0, dst);
-            core.write_fc_long(ea, res)?;
+            core.write_long(ea, res)?;
             Ok(Cycles($cycles))
         });
 }
@@ -2489,7 +2499,7 @@ macro_rules! notop_8 {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let (dst, ea) = operator::$dst(core)?;
             let res = common::$common(core, dst);
-            core.write_fc_byte(ea, mask_out_above_8!(res))?;
+            core.write_byte(ea, mask_out_above_8!(res))?;
             Ok(Cycles($cycles))
         });
 }
@@ -2505,7 +2515,7 @@ macro_rules! notop_16 {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let (dst, ea) = operator::$dst(core)?;
             let res = common::$common(core, dst);
-            core.write_program_word(ea, mask_out_above_16!(res))?;
+            core.write_word(ea, mask_out_above_16!(res))?;
             Ok(Cycles($cycles))
         });
 }
@@ -2521,7 +2531,7 @@ macro_rules! notop_32 {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let (dst, ea) = operator::$dst(core)?;
             let res = common::$common(core, dst);
-            core.write_fc_long(ea, res)?;
+            core.write_long(ea, res)?;
             Ok(Cycles($cycles))
         });
 }
@@ -2916,7 +2926,7 @@ macro_rules! sxx_8 {
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let t = if core.$cond() { 0xffu32 } else { 0u32 };
             let ea = effective_address::$dst(core)?;
-            core.write_fc_byte(ea, t)?;
+            core.write_byte(ea, t)?;
             Ok(Cycles($cycles))
         }
     );
@@ -3399,7 +3409,7 @@ macro_rules! tas_8 {
             c_flag!(core) = 0;
 
             if core.allow_tas_writeback() {
-                core.write_fc_byte(ea, mask_out_above_8!(dst | 0x80))?;
+                core.write_byte(ea, mask_out_above_8!(dst | 0x80))?;
             }
             Ok(Cycles($cycles))
         });

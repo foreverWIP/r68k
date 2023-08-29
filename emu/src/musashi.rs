@@ -71,6 +71,7 @@ extern {
     fn m68k_get_reg(context: *mut libc::c_void, regnum: Register) -> u32;
     fn m68k_set_reg(regnum: Register, value: u32);
     fn m68k_set_irq(irq: u32);
+    static mut m68ki_address_space: u32;
 }
 use ram::{AddressSpace, SUPERVISOR_PROGRAM, SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 use ram::loggingmem::Operation;
@@ -84,7 +85,7 @@ static mut MUSASHI_MEMORY_DATA:  [u8; 1024] = [0; 1024];
 // expected from executing a very limited number of opcodes
 static mut MUSASHI_OPS: [Operation; 512] = [Operation::None; 512];
 static mut MUSASHI_OPCOUNT: usize = 0;
-static mut MUSASHI_ADDRESS_SPACE: AddressSpace = SUPERVISOR_PROGRAM;
+// static mut MUSASHI_ADDRESS_SPACE: AddressSpace = SUPERVISOR_PROGRAM;
 
 unsafe fn register_op(op: Operation) {
     if MUSASHI_OPCOUNT < MUSASHI_OPS.len() {
@@ -99,7 +100,7 @@ pub extern fn m68k_read_memory_8(address: u32) -> u32 {
     unsafe {
         let address = address & ADDRBUS_MASK;
         let value = read_musashi_byte(address);
-        let op = Operation::ReadByte(MUSASHI_ADDRESS_SPACE, address, value);
+        let op = Operation::ReadByte(AddressSpace::from_musashi(m68ki_address_space), address, value);
         register_op(op);
         value as u32
     }
@@ -110,7 +111,7 @@ pub extern fn m68k_read_memory_16(address: u32) -> u32 {
         let address = address & ADDRBUS_MASK;
         let value =  (read_musashi_byte(address+0) as u16) << 8
                     |(read_musashi_byte(address+1) as u16) << 0;
-        let op = Operation::ReadWord(MUSASHI_ADDRESS_SPACE, address, value);
+        let op = Operation::ReadWord(AddressSpace::from_musashi(m68ki_address_space), address, value);
         register_op(op);
         value as u32
     }
@@ -122,7 +123,7 @@ pub extern fn m68k_read_memory_32(address: u32) -> u32 {
                     |(read_musashi_byte(address+1) as u32) << 16
                     |(read_musashi_byte(address+2) as u32) <<  8
                     |(read_musashi_byte(address+3) as u32) <<  0) as u32;
-        let op = Operation::ReadLong(MUSASHI_ADDRESS_SPACE, address, value);
+        let op = Operation::ReadLong(AddressSpace::from_musashi(m68ki_address_space), address, value);
         register_op(op);
         value
     }
@@ -146,7 +147,7 @@ pub extern fn m68k_read_disassembler_32(address: u32) -> u32 {
 #[no_mangle]
 pub extern fn m68k_write_memory_8(address: u32, value: u32) {
     unsafe {
-        let op = Operation::WriteByte(MUSASHI_ADDRESS_SPACE, address, value);
+        let op = Operation::WriteByte(AddressSpace::from_musashi(m68ki_address_space), address, value);
         register_op(op);
         write_musashi_byte(address+0, (value & 0xff) as u8);
     }
@@ -154,7 +155,7 @@ pub extern fn m68k_write_memory_8(address: u32, value: u32) {
 #[no_mangle]
 pub extern fn m68k_write_memory_16(address: u32, value: u32) {
     unsafe {
-        let op = Operation::WriteWord(MUSASHI_ADDRESS_SPACE, address, value);
+        let op = Operation::WriteWord(AddressSpace::from_musashi(m68ki_address_space), address, value);
         register_op(op);
         write_musashi_byte(address+0, ((value & 0xff00) >> 8) as u8);
         write_musashi_byte(address+1, ((value & 0x00ff) >> 0) as u8);
@@ -163,7 +164,7 @@ pub extern fn m68k_write_memory_16(address: u32, value: u32) {
 #[no_mangle]
 pub extern fn m68k_write_memory_32(address: u32, value: u32) {
     unsafe {
-        let op = Operation::WriteLong(MUSASHI_ADDRESS_SPACE, address, value);
+        let op = Operation::WriteLong(AddressSpace::from_musashi(m68ki_address_space), address, value);
         register_op(op);
         write_musashi_byte(address+0, ((value & 0xff000000) >> 24) as u8);
         write_musashi_byte(address+1, ((value & 0x00ff0000) >> 16) as u8);
@@ -218,19 +219,18 @@ pub extern fn cpu_long_branch() {}
 #[no_mangle]
 pub extern fn m68k_set_fc(fc: u32) {
     unsafe {
-        MUSASHI_ADDRESS_SPACE = match fc {
-            0b001 => USER_DATA,
-            0b010 => USER_PROGRAM,
-            0b101 => SUPERVISOR_DATA,
-            0b110 => SUPERVISOR_PROGRAM,
-            _ => panic!("unknown fc: {}", fc),
-        };
-        // println!("set_fc {:?}", MUSASHI_ADDRESS_SPACE);
+        m68ki_address_space = fc;
     }
 }
+const M68K_INT_ACK_AUTOVECTOR: i32 = 0xffffffffu32 as i32;
 #[allow(unused_variables)]
 #[no_mangle]
-pub extern fn cpu_irq_ack(level: i32) -> i32 {panic!("ia")}
+pub extern fn cpu_irq_ack(level: i32) -> i32 {
+    unsafe {
+        m68k_set_irq(0);
+    }
+    M68K_INT_ACK_AUTOVECTOR
+}
 #[no_mangle]
 pub extern fn cpu_instr_callback(pc: u32) {}
 
@@ -431,7 +431,7 @@ mod tests {
 
     extern crate rand;
 
-    use itertools::{Itertools, assert_equal};
+    use itertools::{Itertools, assert_equal, equal};
     use cpu::ops::opcodes::*;
     use super::get_ops;
     // struct OpSeq {
@@ -2593,15 +2593,17 @@ mod tests {
         })
     }
     fn assert_all_memory_accesses_equal(r68k: &TestCore) {
-        println!("musashi ops: ");
-        for op in get_ops() {
-            println!("{:?}", op);
+        if !equal(get_ops(), r68k.mem.logger.ops()) {
+            println!("musashi ops: ");
+            for op in get_ops() {
+                println!("{:?}", op);
+            }
+            println!("r68k ops: ");
+            for op in r68k.mem.logger.ops() {
+                println!("{:?}", op);
+            }
+            assert_equal(get_ops(), r68k.mem.logger.ops());
         }
-        println!("r68k ops: ");
-        for op in r68k.mem.logger.ops() {
-            println!("{:?}", op);
-        }
-        assert_equal(get_ops(), r68k.mem.logger.ops());
     }
     fn memory_accesses_equal_unless_exception(r68k: &TestCore) -> Option<u8> {
         let is_reading_vector = |&op| match op {
@@ -2615,7 +2617,17 @@ mod tests {
         // was taken as Mushashi during address errors, in some cases
         // also executed some instructions from the handler (now fixed)
         if let Some(vector_read_index) = r68k.mem.logger.ops().iter().position(is_reading_vector) {
-            assert_equal(get_ops().iter().take(vector_read_index+1), r68k.mem.logger.ops().iter().take(vector_read_index+1));
+            if !equal(get_ops().iter().take(vector_read_index+1), r68k.mem.logger.ops().iter().take(vector_read_index+1)) {
+                println!("musashi ops: ");
+                for op in get_ops() {
+                    println!("{:?}", op);
+                }
+                println!("r68k ops: ");
+                for op in r68k.mem.logger.ops() {
+                    println!("{:?}", op);
+                }
+                assert_equal(get_ops().iter().take(vector_read_index+1), r68k.mem.logger.ops().iter().take(vector_read_index+1));
+            }
 
             // If we got this far, the memory accesses up to, and
             // including the vector read match up, but we cannot
