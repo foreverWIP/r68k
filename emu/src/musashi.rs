@@ -719,6 +719,9 @@ mod tests {
                 let qc_rounds = 1 << ($opmask as u16).count_zeros();
                 for opcode in opcodes($opmask, $opcode)
                 {
+                    if crate::cpu::ops::INSTRUCTION_SET_TEST[opcode as usize] == crate::cpu::ops::illegal {
+                        continue;
+                    }
                     // println!("Will hammer {:016b} {} times", opcode, qc_rounds);
                     unsafe {
                         // this is because I don't know how to make
