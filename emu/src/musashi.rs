@@ -8,7 +8,7 @@ extern crate libc;
 #[allow(dead_code)]
 pub enum Register {
     /* Real registers */
-    D0,        /* Data registers */
+    D0, /* Data registers */
     D1,
     D2,
     D3,
@@ -16,7 +16,7 @@ pub enum Register {
     D5,
     D6,
     D7,
-    A0,        /* Address registers */
+    A0, /* Address registers */
     A1,
     A2,
     A3,
@@ -24,46 +24,45 @@ pub enum Register {
     A5,
     A6,
     A7,
-    PC,        /* Program Counter */
-    SR,        /* Status Register */
-    SP,        /* The current Stack Pointer (located in A7) */
-    USP,        /* User Stack Pointer */
-    ISP,        /* Interrupt Stack Pointer */
-    MSP,        /* Master Stack Pointer */
-    SFC,        /* Source Function Code */
-    DFC,        /* Destination Function Code */
-    VBR,        /* Vector Base Register */
-    CACR,        /* Cache Control Register */
-    CAAR,        /* Cache Address Register */
+    PC,   /* Program Counter */
+    SR,   /* Status Register */
+    SP,   /* The current Stack Pointer (located in A7) */
+    USP,  /* User Stack Pointer */
+    ISP,  /* Interrupt Stack Pointer */
+    MSP,  /* Master Stack Pointer */
+    SFC,  /* Source Function Code */
+    DFC,  /* Destination Function Code */
+    VBR,  /* Vector Base Register */
+    CACR, /* Cache Control Register */
+    CAAR, /* Cache Address Register */
 
     /* Assumed registers */
     /* These are cheat registers which emulate the 1-longword prefetch
      * present in the 68000 and 68010.
      */
-    PrefAddr,    /* Last prefetch address */
-    PrefData,    /* Last prefetch data */
+    PrefAddr, /* Last prefetch address */
+    PrefData, /* Last prefetch data */
 
     /* Convenience registers */
-    PPC,        /* Previous value in the program counter */
-    IR,            /* Instruction register */
-    CpuType    /* Type of CPU being run */
+    PPC,     /* Previous value in the program counter */
+    IR,      /* Instruction register */
+    CpuType, /* Type of CPU being run */
 }
 
 #[repr(C)]
 #[derive(Copy, Clone)]
 #[allow(dead_code)]
-enum CpuType
-{
+enum CpuType {
     Invalid,
     M68000,
     M68010,
     M68EC020,
     M68020,
-    M68030,        /* Supported by disassembler ONLY */
-    M68040        /* Supported by disassembler ONLY */
+    M68030, /* Supported by disassembler ONLY */
+    M68040, /* Supported by disassembler ONLY */
 }
 #[link(name = "musashi", kind = "static")]
-extern {
+extern "C" {
     fn m68k_init();
     fn m68k_set_cpu_type(cputype: CpuType);
     fn m68k_pulse_reset();
@@ -73,12 +72,14 @@ extern {
     fn m68k_set_irq(irq: u32);
     static mut m68ki_address_space: u32;
 }
-use ram::{AddressSpace, SUPERVISOR_PROGRAM, SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
 use ram::loggingmem::Operation;
+use ram::{
+    AddressSpace, ADDRBUS_MASK, SUPERVISOR_DATA, SUPERVISOR_PROGRAM, USER_DATA, USER_PROGRAM,
+};
 static mut MUSASHI_LOCATIONS_USED: usize = 0;
 static mut MUSASHI_MEMORY_INITIALIZER: u32 = 0xaaaaaaaa;
-static mut MUSASHI_MEMORY_LOCATION:  [u32; 1024] = [0; 1024];
-static mut MUSASHI_MEMORY_DATA:  [u8; 1024] = [0; 1024];
+static mut MUSASHI_MEMORY_LOCATION: [u32; 1024] = [0; 1024];
+static mut MUSASHI_MEMORY_DATA: [u8; 1024] = [0; 1024];
 
 // as statics are not allowed to have destructors, allocate a
 // big enough array to hold the small number of operations
@@ -96,80 +97,104 @@ unsafe fn register_op(op: Operation) {
 }
 // callbacks from Musashi
 #[no_mangle]
-pub extern fn m68k_read_memory_8(address: u32) -> u32 {
+pub extern "C" fn m68k_read_memory_8(address: u32) -> u32 {
     unsafe {
         let address = address & ADDRBUS_MASK;
         let value = read_musashi_byte(address);
-        let op = Operation::ReadByte(AddressSpace::from_musashi(m68ki_address_space), address, value);
+        let op = Operation::ReadByte(
+            AddressSpace::from_musashi(m68ki_address_space),
+            address,
+            value,
+        );
         register_op(op);
         value as u32
     }
 }
 #[no_mangle]
-pub extern fn m68k_read_memory_16(address: u32) -> u32 {
+pub extern "C" fn m68k_read_memory_16(address: u32) -> u32 {
     unsafe {
         let address = address & ADDRBUS_MASK;
-        let value =  (read_musashi_byte(address+0) as u16) << 8
-                    |(read_musashi_byte(address+1) as u16) << 0;
-        let op = Operation::ReadWord(AddressSpace::from_musashi(m68ki_address_space), address, value);
+        let value = (read_musashi_byte(address + 0) as u16) << 8
+            | (read_musashi_byte(address + 1) as u16) << 0;
+        let op = Operation::ReadWord(
+            AddressSpace::from_musashi(m68ki_address_space),
+            address,
+            value,
+        );
         register_op(op);
         value as u32
     }
 }
 #[no_mangle]
-pub extern fn m68k_read_memory_32(address: u32) -> u32 {
+pub extern "C" fn m68k_read_memory_32(address: u32) -> u32 {
     unsafe {
-        let value = ((read_musashi_byte(address+0) as u32) << 24
-                    |(read_musashi_byte(address+1) as u32) << 16
-                    |(read_musashi_byte(address+2) as u32) <<  8
-                    |(read_musashi_byte(address+3) as u32) <<  0) as u32;
-        let op = Operation::ReadLong(AddressSpace::from_musashi(m68ki_address_space), address, value);
+        let value = ((read_musashi_byte(address + 0) as u32) << 24
+            | (read_musashi_byte(address + 1) as u32) << 16
+            | (read_musashi_byte(address + 2) as u32) << 8
+            | (read_musashi_byte(address + 3) as u32) << 0) as u32;
+        let op = Operation::ReadLong(
+            AddressSpace::from_musashi(m68ki_address_space),
+            address,
+            value,
+        );
         register_op(op);
         value
     }
 }
 
 #[no_mangle]
-pub extern fn m68k_read_disassembler_8(address: u32) -> u32 {
+pub extern "C" fn m68k_read_disassembler_8(address: u32) -> u32 {
     m68k_read_memory_8(address)
 }
 
 #[no_mangle]
-pub extern fn m68k_read_disassembler_16(address: u32) -> u32 {
+pub extern "C" fn m68k_read_disassembler_16(address: u32) -> u32 {
     m68k_read_memory_16(address)
 }
 
 #[no_mangle]
-pub extern fn m68k_read_disassembler_32(address: u32) -> u32 {
+pub extern "C" fn m68k_read_disassembler_32(address: u32) -> u32 {
     m68k_read_memory_32(address)
 }
 
 #[no_mangle]
-pub extern fn m68k_write_memory_8(address: u32, value: u32) {
+pub extern "C" fn m68k_write_memory_8(address: u32, value: u32) {
     unsafe {
-        let op = Operation::WriteByte(AddressSpace::from_musashi(m68ki_address_space), address, value);
+        let op = Operation::WriteByte(
+            AddressSpace::from_musashi(m68ki_address_space),
+            address,
+            value,
+        );
         register_op(op);
-        write_musashi_byte(address+0, (value & 0xff) as u8);
+        write_musashi_byte(address + 0, (value & 0xff) as u8);
     }
 }
 #[no_mangle]
-pub extern fn m68k_write_memory_16(address: u32, value: u32) {
+pub extern "C" fn m68k_write_memory_16(address: u32, value: u32) {
     unsafe {
-        let op = Operation::WriteWord(AddressSpace::from_musashi(m68ki_address_space), address, value);
+        let op = Operation::WriteWord(
+            AddressSpace::from_musashi(m68ki_address_space),
+            address,
+            value,
+        );
         register_op(op);
-        write_musashi_byte(address+0, ((value & 0xff00) >> 8) as u8);
-        write_musashi_byte(address+1, ((value & 0x00ff) >> 0) as u8);
+        write_musashi_byte(address + 0, ((value & 0xff00) >> 8) as u8);
+        write_musashi_byte(address + 1, ((value & 0x00ff) >> 0) as u8);
     }
 }
 #[no_mangle]
-pub extern fn m68k_write_memory_32(address: u32, value: u32) {
+pub extern "C" fn m68k_write_memory_32(address: u32, value: u32) {
     unsafe {
-        let op = Operation::WriteLong(AddressSpace::from_musashi(m68ki_address_space), address, value);
+        let op = Operation::WriteLong(
+            AddressSpace::from_musashi(m68ki_address_space),
+            address,
+            value,
+        );
         register_op(op);
-        write_musashi_byte(address+0, ((value & 0xff000000) >> 24) as u8);
-        write_musashi_byte(address+1, ((value & 0x00ff0000) >> 16) as u8);
-        write_musashi_byte(address+2, ((value & 0x0000ff00) >>  8) as u8);
-        write_musashi_byte(address+3, ((value & 0x000000ff) >>  0) as u8);
+        write_musashi_byte(address + 0, ((value & 0xff000000) >> 24) as u8);
+        write_musashi_byte(address + 1, ((value & 0x00ff0000) >> 16) as u8);
+        write_musashi_byte(address + 2, ((value & 0x0000ff00) >> 8) as u8);
+        write_musashi_byte(address + 3, ((value & 0x000000ff) >> 0) as u8);
     }
 }
 // read uninitialized bytes from initializer instead
@@ -177,17 +202,17 @@ unsafe fn read_initializer(address: u32) -> u8 {
     let shift = match address % 4 {
         0 => 24,
         1 => 16,
-        2 =>  8,
-        _ =>  0,
+        2 => 8,
+        _ => 0,
     };
     ((MUSASHI_MEMORY_INITIALIZER >> shift) & 0xFF) as u8
 }
 unsafe fn find_musashi_location(address: u32) -> Option<usize> {
     for i in 0..MUSASHI_LOCATIONS_USED {
         if MUSASHI_MEMORY_LOCATION[i as usize] == address {
-            return Some(i as usize)
+            return Some(i as usize);
         }
-    };
+    }
     None
 }
 unsafe fn read_musashi_byte(address: u32) -> u8 {
@@ -213,11 +238,13 @@ unsafe fn write_musashi_byte(address: u32, data: u8) {
 }
 
 #[no_mangle]
-pub extern fn cpu_pulse_reset() {panic!("pr")}
+pub extern "C" fn cpu_pulse_reset() {
+    panic!("pr")
+}
 #[no_mangle]
-pub extern fn cpu_long_branch() {}
+pub extern "C" fn cpu_long_branch() {}
 #[no_mangle]
-pub extern fn m68k_set_fc(fc: u32) {
+pub extern "C" fn m68k_set_fc(fc: u32) {
     unsafe {
         m68ki_address_space = fc;
     }
@@ -225,50 +252,67 @@ pub extern fn m68k_set_fc(fc: u32) {
 const M68K_INT_ACK_AUTOVECTOR: i32 = 0xffffffffu32 as i32;
 #[allow(unused_variables)]
 #[no_mangle]
-pub extern fn cpu_irq_ack(level: i32) -> i32 {
+pub extern "C" fn cpu_irq_ack(level: i32) -> i32 {
     unsafe {
         m68k_set_irq(0);
     }
     M68K_INT_ACK_AUTOVECTOR
 }
 #[no_mangle]
-pub extern fn cpu_instr_callback(pc: u32) {}
+pub extern "C" fn cpu_instr_callback(pc: u32) {}
 
 use std::ptr;
 
 #[allow(unused_variables)]
 pub fn experimental_communication() {
-    let _guard = match MUSASHI_LOCK.lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-
     unsafe {
+        ::set_lock!(MUSASHI_LOCK);
+
         m68k_init();
         m68k_set_cpu_type(CpuType::M68000);
         m68k_set_reg(Register::D0, 123);
         println!("D0: {}", m68k_get_reg(ptr::null_mut(), Register::D0));
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 }
 
 #[allow(unused_variables)]
 pub fn roundtrip_register(reg: Register, value: u32) -> u32 {
-    let _guard = match MUSASHI_LOCK.lock() {
-        Ok(guard) => guard,
-        Err(poisoned) => poisoned.into_inner(),
-    };
-
+    let mut ret: u32 = 0;
     unsafe {
+        ::set_lock!(MUSASHI_LOCK);
+
         m68k_init();
         m68k_set_cpu_type(CpuType::M68000);
         m68k_set_reg(reg, value);
-        m68k_get_reg(ptr::null_mut(), reg)
+        ret = m68k_get_reg(ptr::null_mut(), reg);
+
+        ::release_lock!(MUSASHI_LOCK);
     }
+    ret
 }
 
-use cpu::{TestCore, Cycles};
+use cpu::{Cycles, TestCore};
 
-static REGS:[Register; 16] = [Register::D0, Register::D1, Register::D2, Register::D3, Register::D4, Register::D5, Register::D6, Register::D7, Register::A0, Register::A1, Register::A2, Register::A3, Register::A4, Register::A5, Register::A6, Register::A7];
+static REGS: [Register; 16] = [
+    Register::D0,
+    Register::D1,
+    Register::D2,
+    Register::D3,
+    Register::D4,
+    Register::D5,
+    Register::D6,
+    Register::D7,
+    Register::A0,
+    Register::A1,
+    Register::A2,
+    Register::A3,
+    Register::A4,
+    Register::A5,
+    Register::A6,
+    Register::A7,
+];
 
 fn get_ops() -> Vec<Operation> {
     let mut res: Vec<Operation> = vec![];
@@ -321,9 +365,7 @@ pub fn initialize_musashi_memory(initializer: u32) {
     }
 }
 pub fn musashi_written_bytes() -> u16 {
-    unsafe {
-        MUSASHI_LOCATIONS_USED as u16
-    }
+    unsafe { MUSASHI_LOCATIONS_USED as u16 }
 }
 const EXEC_CYCLES: i32 = 1; // configurable for testing purposes
 pub fn execute1(core: &mut TestCore) -> Cycles {
@@ -361,7 +403,6 @@ pub fn reset_and_execute1(core: &mut TestCore, memory_initializer: u32) -> Cycle
     execute1(core)
 }
 
-
 // Talking to Musashi isn't thread-safe, and the tests are running
 // threaded, which cause intermittent test failures unless serializing
 // access using something like a mutex. Musashi functions are called in
@@ -369,19 +410,36 @@ pub fn reset_and_execute1(core: &mut TestCore, memory_initializer: u32) -> Cycle
 // destructors
 use std::sync::Mutex;
 
-static MUSASHI_LOCK: Mutex<i32> = Mutex::new(0);
-static QUICKCHECK_LOCK: Mutex<i32> = Mutex::new(0);
+static MUSASHI_LOCK: Mutex<bool> = Mutex::new(false);
+static QUICKCHECK_LOCK: Mutex<bool> = Mutex::new(false);
+#[macro_export]
+macro_rules! set_lock {
+    ($lock:ident) => {
+        let _guard = match $lock.lock() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+    };
+}
+#[macro_export]
+macro_rules! release_lock {
+    ($lock:ident) => {
+        
+    };
+}
 
+#[macro_use]
 mod tests {
-    use super::*;
-    use ram::SUPERVISOR_PROGRAM;
     use super::MUSASHI_LOCK;
     use super::QUICKCHECK_LOCK;
-    use ram::AddressBus;
-    use ram::loggingmem::Operation;
-    use cpu::{TestCore, EXCEPTION_ZERO_DIVIDE, EXCEPTION_CHK, Cycles};
-    use std::cmp;
+    use super::*;
+    use cpu::{Cycles, TestCore, EXCEPTION_CHK, EXCEPTION_ZERO_DIVIDE};
     use musashi::tests::rand::Rng;
+    use ram::loggingmem::Operation;
+    use ram::AddressBus;
+    use ram::SUPERVISOR_PROGRAM;
+    use std::cmp;
+    use {release_lock, set_lock};
 
     extern crate quickcheck;
     use self::quickcheck::*;
@@ -392,10 +450,14 @@ mod tests {
             let mut rng = rand::thread_rng();
             // when size 256, could generate any 32 bit pattern
             let nonuniform: u32 = rng.gen_range(0..256); // g.gen_range(0, 256);
-            // increase likelihood of returning all zeros to 1:32
-            if nonuniform < 8 {return Bitpattern(0)}
+                                                         // increase likelihood of returning all zeros to 1:32
+            if nonuniform < 8 {
+                return Bitpattern(0);
+            }
             // increase likelihood of returning all ones to 1:32
-            if nonuniform < 16 {return Bitpattern(0xffffffff)}
+            if nonuniform < 16 {
+                return Bitpattern(0xffffffff);
+            }
             let i1: u32 = Arbitrary::arbitrary(g);
             let i2: u32 = Arbitrary::arbitrary(g);
             let i3: u32 = Arbitrary::arbitrary(g);
@@ -403,12 +465,12 @@ mod tests {
             let sum: u32 = (i1 << 24) | (i2 << 16) | (i3 << 8) | i4;
             Bitpattern(sum)
         }
-        fn shrink(&self) -> Box<dyn Iterator<Item=Self>> {
+        fn shrink(&self) -> Box<dyn Iterator<Item = Self>> {
             match *self {
                 Bitpattern(x) => {
                     let xs = x.shrink(); // should shrink Bitpattern by clearing bits, not setting new ones
                     let tagged = xs //.inspect(|x|println!("{}", x))
-                    .map(Bitpattern);
+                        .map(Bitpattern);
                     Box::new(tagged)
                 }
             }
@@ -417,8 +479,23 @@ mod tests {
 
     impl Arbitrary for Register {
         fn arbitrary(g: &mut Gen) -> Register {
-            let regs = [Register::D0, Register::D1, Register::D2, Register::D3, Register::D4, Register::D5, Register::D6, Register::D7, Register::A0, Register::A1, Register::A2, Register::A3, Register::A4, Register::A5, Register::A6,
-            Register::SR, // Register::A7, Register::SP, Register::PC
+            let regs = [
+                Register::D0,
+                Register::D1,
+                Register::D2,
+                Register::D3,
+                Register::D4,
+                Register::D5,
+                Register::D6,
+                Register::D7,
+                Register::A0,
+                Register::A1,
+                Register::A2,
+                Register::A3,
+                Register::A4,
+                Register::A5,
+                Register::A6,
+                Register::SR, // Register::A7, Register::SP, Register::PC
             ];
             //println!("{}",i);
             if let Some(&reg) = g.choose(&regs) {
@@ -431,9 +508,9 @@ mod tests {
 
     extern crate rand;
 
-    use itertools::{Itertools, assert_equal, equal};
-    use cpu::ops::opcodes::*;
     use super::get_ops;
+    use cpu::ops::opcodes::*;
+    use itertools::{assert_equal, equal, Itertools};
     // struct OpSeq {
     //     mask: u32,
     //     matching: u32,
@@ -466,14 +543,17 @@ mod tests {
     fn opcodes(mask: u32, matching: u32) -> Vec<u16> {
         (matching..0x10000u32)
             .filter(|opcode| (opcode & mask) == matching)
-            .map(|v|v as u16).collect::<Vec<u16>>()
+            .map(|v| v as u16)
+            .collect::<Vec<u16>>()
     }
     macro_rules! opcodes {
-        ($mask:expr , $matching:expr) => {($matching..0x10000).filter(|opcode| (opcode & $mask) == $matching)}
+        ($mask:expr , $matching:expr) => {
+            ($matching..0x10000).filter(|opcode| (opcode & $mask) == $matching)
+        };
     }
 
     #[test]
-    fn opcodes_from_mask_and_matching(){
+    fn opcodes_from_mask_and_matching() {
         let mut opseq = Vec::new();
         opseq.extend(opcodes!(MASK_OUT_X_Y, OP_ABCD_8_RR));
         assert_eq!(64, opseq.len());
@@ -491,6 +571,7 @@ mod tests {
     }
 
     static mut OPCODE_UNDER_TEST: u16 = 0;
+    static mut OPCODE_UNDER_TEST_ACCESSES: usize = 0;
 
     fn hammer_cores_even_addresses(memory_pattern: Bitpattern, rs: Vec<(Register, Bitpattern)>) -> TestResult {
         let mem_mask = (2<<24)-2; // keep even
@@ -505,19 +586,22 @@ mod tests {
         hammer_cores_with(mem_mask, memory_pattern, rs, true)
     }
 
-    fn hammer_cores_with(mem_mask: u32, memory_pattern: Bitpattern, rs: Vec<(Register, Bitpattern)>, allow_exception: bool) -> TestResult {
+    fn hammer_cores_with(mem_mask: u32, memory_pattern: Bitpattern, rs: Vec<(Register, Bitpattern)>, allow_exception: bool) -> TestResult {  
         let pc = 0x140;
         let mem = unsafe {
-            [((OPCODE_UNDER_TEST >> 8) & 0xff) as u8, (OPCODE_UNDER_TEST & 0xff) as u8]
+            [
+                ((OPCODE_UNDER_TEST >> 8) & 0xff) as u8,
+                (OPCODE_UNDER_TEST & 0xff) as u8,
+            ]
         };
         let Bitpattern(memory_initializer) = memory_pattern;
         let mut musashi = TestCore::new_mem_init_for_tests(pc, &mem, memory_initializer & mem_mask);
-        const STACK_MASK:u32 = 1024-16; // keep even
+        const STACK_MASK: u32 = 1024 - 16; // keep even
         musashi.inactive_ssp = 0x128;
         musashi.inactive_usp = 0x256;
         for r in 0..8 {
             musashi.dar[r] = 0;
-            musashi.dar[8+r] = 0x128;
+            musashi.dar[8 + r] = 0x128;
         }
         // set up RESET vector in memory
         let (ssp, pc) = (musashi.ssp(), musashi.pc);
@@ -532,7 +616,9 @@ mod tests {
         // in some cases got extra cycles via a negative deduction issue
         // and continued execution for several more cycles (now fixed)
         for i in 0..4 {
-            musashi.write_program_word(generic_handler + 2 * i, OP_NOP).unwrap();
+            musashi
+                .write_program_word(generic_handler + 2 * i, OP_NOP)
+                .unwrap();
         }
 
         for r in rs {
@@ -546,27 +632,25 @@ mod tests {
                 (Register::D6, Bitpattern(bp)) => musashi.dar[6] = bp,
                 (Register::D7, Bitpattern(bp)) => musashi.dar[7] = bp,
                 // must ensure Addresses are within musashi memory space!
-                (Register::A0, Bitpattern(bp)) => musashi.dar[0+8] = bp & mem_mask,
-                (Register::A1, Bitpattern(bp)) => musashi.dar[1+8] = bp & mem_mask,
-                (Register::A2, Bitpattern(bp)) => musashi.dar[2+8] = bp & mem_mask,
-                (Register::A3, Bitpattern(bp)) => musashi.dar[3+8] = bp & mem_mask,
-                (Register::A4, Bitpattern(bp)) => musashi.dar[4+8] = bp & mem_mask,
-                (Register::A5, Bitpattern(bp)) => musashi.dar[5+8] = bp & mem_mask,
-                (Register::A6, Bitpattern(bp)) => musashi.dar[6+8] = bp & mem_mask,
-                (Register::A7, Bitpattern(bp)) => musashi.dar[7+8] = bp & STACK_MASK + 8,
+                (Register::A0, Bitpattern(bp)) => musashi.dar[0 + 8] = bp & mem_mask,
+                (Register::A1, Bitpattern(bp)) => musashi.dar[1 + 8] = bp & mem_mask,
+                (Register::A2, Bitpattern(bp)) => musashi.dar[2 + 8] = bp & mem_mask,
+                (Register::A3, Bitpattern(bp)) => musashi.dar[3 + 8] = bp & mem_mask,
+                (Register::A4, Bitpattern(bp)) => musashi.dar[4 + 8] = bp & mem_mask,
+                (Register::A5, Bitpattern(bp)) => musashi.dar[5 + 8] = bp & mem_mask,
+                (Register::A6, Bitpattern(bp)) => musashi.dar[6 + 8] = bp & mem_mask,
+                (Register::A7, Bitpattern(bp)) => musashi.dar[7 + 8] = bp & STACK_MASK + 8,
                 (Register::USP, Bitpattern(bp)) => musashi.inactive_usp = bp & STACK_MASK + 8,
                 (Register::SR, Bitpattern(bp)) => musashi.sr_to_flags(bp as u16),
                 _ => {
                     panic!("No idea how to set {:?}", r.0)
-                },
+                }
             }
         }
         musashi.s_flag = 4;
         let mut r68k = musashi.clone(); // so very self-aware!
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+
+        ::set_lock!(MUSASHI_LOCK);
 
         let musashi_cycles = reset_and_execute1(&mut musashi, memory_initializer & mem_mask);
         let r68k_cycles = r68k.execute(super::EXEC_CYCLES);
@@ -576,7 +660,8 @@ mod tests {
         // the same spot) and we allow exceptions (or we would discard
         // all results for those instructions that always result  in
         // exceptions such as illegal/unimplemented or traps)
-        let can_compare_cycles = if let Some(vector) = memory_accesses_equal_unless_exception(&r68k) {
+        let can_compare_cycles = if let Some(vector) = memory_accesses_equal_unless_exception(&r68k)
+        {
             if musashi.pc != r68k.pc || !allow_exception {
                 return TestResult::discard();
             } else {
@@ -584,61 +669,87 @@ mod tests {
                 // Musashis handling of CHK and DIV exceptions
                 vector != EXCEPTION_ZERO_DIVIDE && vector != EXCEPTION_CHK
             }
-        } else {true};
-        if cores_equal(&musashi, &r68k) {
+        } else {
+            true
+        };
+        let ret = if cores_equal(&musashi, &r68k) {
             if can_compare_cycles && musashi_cycles != r68k_cycles {
                 println!("Musashi {:?} but r68k {:?}", musashi_cycles, r68k_cycles);
             }
             TestResult::from_bool(!can_compare_cycles || musashi_cycles == r68k_cycles)
         } else {
             TestResult::failed()
-        }
+        };
+        ::release_lock!(MUSASHI_LOCK);
+        ret
     }
 
     macro_rules! qc8 {
-        ($opmask:ident, $opcode:ident, $fn_name:ident) => (qc!($opmask, $opcode, $fn_name, hammer_cores););
+        ($opmask:ident, $opcode:ident, $fn_name:ident) => {
+            qc!($opmask, $opcode, $fn_name, hammer_cores);
+        };
     }
     macro_rules! qc_allow_exception {
-        ($opmask:ident, $opcode:ident, $fn_name:ident) => (qc!($opmask, $opcode, $fn_name, hammer_cores_allow_exception););
+        ($opmask:ident, $opcode:ident, $fn_name:ident) => {
+            qc!($opmask, $opcode, $fn_name, hammer_cores_allow_exception);
+        };
     }
     macro_rules! qc {
-        ($opmask:ident, $opcode:ident, $fn_name:ident) => (qc!($opmask, $opcode, $fn_name, hammer_cores_even_addresses););
-        ($opmask:ident, $opcode:ident, $fn_name:ident, $hammer:ident) => (
-        #[test]
-        // #[ignore]
+        ($opmask:ident, $opcode:ident, $fn_name:ident) => {
+            qc!($opmask, $opcode, $fn_name, hammer_cores_even_addresses);
+        };
+        ($opmask:ident, $opcode:ident, $fn_name:ident, $hammer:ident) => {
+            #[test]
+            // #[ignore]
             fn $fn_name() {
-            // Musashi isn't thread safe, and the construct with OPCODE_UNDER_TEST
-            // isn't either. :(
-            let _guard = match QUICKCHECK_LOCK.lock() {
-                Ok(guard) => guard,
-                Err(poisoned) => poisoned.into_inner(),
-            };
-            // check for mask/opcode inconsistency
-            assert!($opmask & $opcode == $opcode);
-            let qc_rounds = cmp::max(1, 384 >> ($opmask as u16).count_zeros());
-            for opcode in opcodes($opmask, $opcode)
-            {
-                println!("Will hammer {:016b} {} times", opcode, qc_rounds);
-                unsafe {
-                    // this is because I don't know how to make
-                    // hammer_cores take the opcode as a parameter and
-                    // we cannot simply use a closure either; see
-                    // https://github.com/BurntSushi/quickcheck/issues/56
-                    OPCODE_UNDER_TEST = opcode;
+                // Musashi isn't thread safe, and the construct with OPCODE_UNDER_TEST
+                // isn't either. :(
+                ::set_lock!(QUICKCHECK_LOCK);
+                // check for mask/opcode inconsistency
+                assert!($opmask & $opcode == $opcode);
+                // the naive way of calculating the amount of bit permutations would
+                // look something like the following:
+                // let qc_rounds = cmp::max(1, u32::pow(2, ($opmask as u16).count_zeros()));
+                // note that for the pow-based computation above ^^^ because a max function
+                // is used with the other argument being 1, that no zero bits leads to a
+                // result of 1. 1 zero bit leads to a result of 2 (since both values of
+                // the bit need to be tested), 2 zero bits leads to a result of 4,
+                // 3 bits leads to 8, and so on. this means that the whole computation can
+                // be reduced to a single shift
+                let qc_rounds = 1 << ($opmask as u16).count_zeros();
+                for opcode in opcodes($opmask, $opcode)
+                {
+                    // println!("Will hammer {:016b} {} times", opcode, qc_rounds);
+                    unsafe {
+                        // this is because I don't know how to make
+                        // hammer_cores take the opcode as a parameter and
+                        // we cannot simply use a closure either; see
+                        // https://github.com/BurntSushi/quickcheck/issues/56
+                        OPCODE_UNDER_TEST = opcode;
+                    }
+                    QuickCheck::new()
+                        .gen(Gen::new(256))
+                        .tests(qc_rounds as u64)
+                        .quickcheck($hammer as fn(_, _) -> _);
                 }
-                QuickCheck::new()
-                .gen(Gen::new(256))
-                .tests(qc_rounds)
-                .quickcheck($hammer as fn(_, _) -> _);
+                ::release_lock!(QUICKCHECK_LOCK);
             }
-        })
+        };
     }
 
     use r68k_common::constants::*;
 
     const MASK_LO3NIB_QUICKER: u32 = MASK_LO3NIB + 0x0555;
-    qc_allow_exception!(MASK_LO3NIB_QUICKER, OP_UNIMPLEMENTED_1010, qc_unimplemented_1010);
-    qc_allow_exception!(MASK_LO3NIB_QUICKER, OP_UNIMPLEMENTED_1111, qc_unimplemented_1111);
+    qc_allow_exception!(
+        MASK_LO3NIB_QUICKER,
+        OP_UNIMPLEMENTED_1010,
+        qc_unimplemented_1010
+    );
+    qc_allow_exception!(
+        MASK_LO3NIB_QUICKER,
+        OP_UNIMPLEMENTED_1111,
+        qc_unimplemented_1111
+    );
 
     qc8!(MASK_OUT_X_Y, OP_ABCD_8_RR, qc_abcd_rr);
     qc8!(MASK_OUT_X_Y, OP_ABCD_8_MM, qc_abcd_mm);
@@ -1290,13 +1401,13 @@ mod tests {
     qc!(MASK_EXACT, OP_JSR_32_PCIX, qc_jsr_32_pcix);
 
     // Put qc for LEA here
-    qc!(MASK_OUT_X_Y, OP_LEA_32_AI,   qc_lea_32_ai);
-    qc!(MASK_OUT_X,   OP_LEA_32_AL,   qc_lea_32_al);
-    qc!(MASK_OUT_X,   OP_LEA_32_AW,   qc_lea_32_aw);
-    qc!(MASK_OUT_X_Y, OP_LEA_32_DI,   qc_lea_32_di);
-    qc!(MASK_OUT_X_Y, OP_LEA_32_IX,   qc_lea_32_ix);
-    qc!(MASK_OUT_X,   OP_LEA_32_PCDI, qc_lea_32_pcdi);
-    qc!(MASK_OUT_X,   OP_LEA_32_PCIX, qc_lea_32_pcix);
+    qc!(MASK_OUT_X_Y, OP_LEA_32_AI, qc_lea_32_ai);
+    qc!(MASK_OUT_X, OP_LEA_32_AL, qc_lea_32_al);
+    qc!(MASK_OUT_X, OP_LEA_32_AW, qc_lea_32_aw);
+    qc!(MASK_OUT_X_Y, OP_LEA_32_DI, qc_lea_32_di);
+    qc!(MASK_OUT_X_Y, OP_LEA_32_IX, qc_lea_32_ix);
+    qc!(MASK_OUT_X, OP_LEA_32_PCDI, qc_lea_32_pcdi);
+    qc!(MASK_OUT_X, OP_LEA_32_PCIX, qc_lea_32_pcix);
 
     // Put qc for LINK here
     qc!(MASK_OUT_Y, OP_LINK_16, qc_link_16);
@@ -1339,8 +1450,8 @@ mod tests {
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_PD_DN, qc_move_8_pd_dn);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_DI_DN, qc_move_8_di_dn);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_IX_DN, qc_move_8_ix_dn);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AW_DN, qc_move_8_aw_dn);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AL_DN, qc_move_8_al_dn);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AW_DN, qc_move_8_aw_dn);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AL_DN, qc_move_8_al_dn);
 
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_DN_AI, qc_move_8_dn_ai);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_AI_AI, qc_move_8_ai_ai);
@@ -1348,8 +1459,8 @@ mod tests {
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_PD_AI, qc_move_8_pd_ai);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_DI_AI, qc_move_8_di_ai);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_IX_AI, qc_move_8_ix_ai);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AW_AI, qc_move_8_aw_ai);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AL_AI, qc_move_8_al_ai);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AW_AI, qc_move_8_aw_ai);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AL_AI, qc_move_8_al_ai);
 
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_DN_PI, qc_move_8_dn_pi);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_AI_PI, qc_move_8_ai_pi);
@@ -1357,8 +1468,8 @@ mod tests {
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_PD_PI, qc_move_8_pd_pi);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_DI_PI, qc_move_8_di_pi);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_IX_PI, qc_move_8_ix_pi);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AW_PI, qc_move_8_aw_pi);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AL_PI, qc_move_8_al_pi);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AW_PI, qc_move_8_aw_pi);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AL_PI, qc_move_8_al_pi);
 
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_DN_PD, qc_move_8_dn_pd);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_AI_PD, qc_move_8_ai_pd);
@@ -1366,8 +1477,8 @@ mod tests {
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_PD_PD, qc_move_8_pd_pd);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_DI_PD, qc_move_8_di_pd);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_IX_PD, qc_move_8_ix_pd);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AW_PD, qc_move_8_aw_pd);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AL_PD, qc_move_8_al_pd);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AW_PD, qc_move_8_aw_pd);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AL_PD, qc_move_8_al_pd);
 
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_DN_DI, qc_move_8_dn_di);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_AI_DI, qc_move_8_ai_di);
@@ -1375,8 +1486,8 @@ mod tests {
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_PD_DI, qc_move_8_pd_di);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_DI_DI, qc_move_8_di_di);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_IX_DI, qc_move_8_ix_di);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AW_DI, qc_move_8_aw_di);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AL_DI, qc_move_8_al_di);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AW_DI, qc_move_8_aw_di);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AL_DI, qc_move_8_al_di);
 
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_DN_IX, qc_move_8_dn_ix);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_AI_IX, qc_move_8_ai_ix);
@@ -1384,8 +1495,8 @@ mod tests {
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_PD_IX, qc_move_8_pd_ix);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_DI_IX, qc_move_8_di_ix);
     qc8!(MASK_OUT_X_Y, OP_MOVE_8_IX_IX, qc_move_8_ix_ix);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AW_IX, qc_move_8_aw_ix);
-    qc8!(MASK_OUT_Y,   OP_MOVE_8_AL_IX, qc_move_8_al_ix);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AW_IX, qc_move_8_aw_ix);
+    qc8!(MASK_OUT_Y, OP_MOVE_8_AL_IX, qc_move_8_al_ix);
 
     qc8!(MASK_OUT_X, OP_MOVE_8_DN_AW, qc_move_8_dn_aw);
     qc8!(MASK_OUT_X, OP_MOVE_8_AI_AW, qc_move_8_ai_aw);
@@ -1438,8 +1549,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_16_PD_DN, qc_move_16_pd_dn);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DI_DN, qc_move_16_di_dn);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_IX_DN, qc_move_16_ix_dn);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AW_DN, qc_move_16_aw_dn);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AL_DN, qc_move_16_al_dn);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AW_DN, qc_move_16_aw_dn);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AL_DN, qc_move_16_al_dn);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DN_AN, qc_move_16_dn_an);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_AI_AN, qc_move_16_ai_an);
@@ -1447,8 +1558,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_16_PD_AN, qc_move_16_pd_an);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DI_AN, qc_move_16_di_an);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_IX_AN, qc_move_16_ix_an);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AW_AN, qc_move_16_aw_an);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AL_AN, qc_move_16_al_an);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AW_AN, qc_move_16_aw_an);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AL_AN, qc_move_16_al_an);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DN_AI, qc_move_16_dn_ai);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_AI_AI, qc_move_16_ai_ai);
@@ -1456,8 +1567,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_16_PD_AI, qc_move_16_pd_ai);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DI_AI, qc_move_16_di_ai);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_IX_AI, qc_move_16_ix_ai);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AW_AI, qc_move_16_aw_ai);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AL_AI, qc_move_16_al_ai);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AW_AI, qc_move_16_aw_ai);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AL_AI, qc_move_16_al_ai);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DN_PI, qc_move_16_dn_pi);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_AI_PI, qc_move_16_ai_pi);
@@ -1465,8 +1576,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_16_PD_PI, qc_move_16_pd_pi);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DI_PI, qc_move_16_di_pi);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_IX_PI, qc_move_16_ix_pi);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AW_PI, qc_move_16_aw_pi);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AL_PI, qc_move_16_al_pi);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AW_PI, qc_move_16_aw_pi);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AL_PI, qc_move_16_al_pi);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DN_PD, qc_move_16_dn_pd);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_AI_PD, qc_move_16_ai_pd);
@@ -1474,8 +1585,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_16_PD_PD, qc_move_16_pd_pd);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DI_PD, qc_move_16_di_pd);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_IX_PD, qc_move_16_ix_pd);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AW_PD, qc_move_16_aw_pd);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AL_PD, qc_move_16_al_pd);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AW_PD, qc_move_16_aw_pd);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AL_PD, qc_move_16_al_pd);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DN_DI, qc_move_16_dn_di);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_AI_DI, qc_move_16_ai_di);
@@ -1483,8 +1594,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_16_PD_DI, qc_move_16_pd_di);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DI_DI, qc_move_16_di_di);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_IX_DI, qc_move_16_ix_di);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AW_DI, qc_move_16_aw_di);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AL_DI, qc_move_16_al_di);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AW_DI, qc_move_16_aw_di);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AL_DI, qc_move_16_al_di);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DN_IX, qc_move_16_dn_ix);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_AI_IX, qc_move_16_ai_ix);
@@ -1492,8 +1603,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_16_PD_IX, qc_move_16_pd_ix);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_DI_IX, qc_move_16_di_ix);
     qc!(MASK_OUT_X_Y, OP_MOVE_16_IX_IX, qc_move_16_ix_ix);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AW_IX, qc_move_16_aw_ix);
-    qc!(MASK_OUT_Y,   OP_MOVE_16_AL_IX, qc_move_16_al_ix);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AW_IX, qc_move_16_aw_ix);
+    qc!(MASK_OUT_Y, OP_MOVE_16_AL_IX, qc_move_16_al_ix);
 
     qc!(MASK_OUT_X, OP_MOVE_16_DN_AW, qc_move_16_dn_aw);
     qc!(MASK_OUT_X, OP_MOVE_16_AI_AW, qc_move_16_ai_aw);
@@ -1546,8 +1657,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_32_PD_DN, qc_move_32_pd_dn);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DI_DN, qc_move_32_di_dn);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_IX_DN, qc_move_32_ix_dn);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AW_DN, qc_move_32_aw_dn);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AL_DN, qc_move_32_al_dn);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AW_DN, qc_move_32_aw_dn);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AL_DN, qc_move_32_al_dn);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DN_AN, qc_move_32_dn_an);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_AI_AN, qc_move_32_ai_an);
@@ -1555,8 +1666,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_32_PD_AN, qc_move_32_pd_an);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DI_AN, qc_move_32_di_an);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_IX_AN, qc_move_32_ix_an);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AW_AN, qc_move_32_aw_an);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AL_AN, qc_move_32_al_an);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AW_AN, qc_move_32_aw_an);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AL_AN, qc_move_32_al_an);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DN_AI, qc_move_32_dn_ai);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_AI_AI, qc_move_32_ai_ai);
@@ -1564,8 +1675,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_32_PD_AI, qc_move_32_pd_ai);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DI_AI, qc_move_32_di_ai);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_IX_AI, qc_move_32_ix_ai);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AW_AI, qc_move_32_aw_ai);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AL_AI, qc_move_32_al_ai);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AW_AI, qc_move_32_aw_ai);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AL_AI, qc_move_32_al_ai);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DN_PI, qc_move_32_dn_pi);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_AI_PI, qc_move_32_ai_pi);
@@ -1573,8 +1684,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_32_PD_PI, qc_move_32_pd_pi);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DI_PI, qc_move_32_di_pi);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_IX_PI, qc_move_32_ix_pi);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AW_PI, qc_move_32_aw_pi);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AL_PI, qc_move_32_al_pi);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AW_PI, qc_move_32_aw_pi);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AL_PI, qc_move_32_al_pi);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DN_PD, qc_move_32_dn_pd);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_AI_PD, qc_move_32_ai_pd);
@@ -1582,8 +1693,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_32_PD_PD, qc_move_32_pd_pd);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DI_PD, qc_move_32_di_pd);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_IX_PD, qc_move_32_ix_pd);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AW_PD, qc_move_32_aw_pd);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AL_PD, qc_move_32_al_pd);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AW_PD, qc_move_32_aw_pd);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AL_PD, qc_move_32_al_pd);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DN_DI, qc_move_32_dn_di);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_AI_DI, qc_move_32_ai_di);
@@ -1591,8 +1702,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_32_PD_DI, qc_move_32_pd_di);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DI_DI, qc_move_32_di_di);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_IX_DI, qc_move_32_ix_di);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AW_DI, qc_move_32_aw_di);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AL_DI, qc_move_32_al_di);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AW_DI, qc_move_32_aw_di);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AL_DI, qc_move_32_al_di);
 
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DN_IX, qc_move_32_dn_ix);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_AI_IX, qc_move_32_ai_ix);
@@ -1600,8 +1711,8 @@ mod tests {
     qc!(MASK_OUT_X_Y, OP_MOVE_32_PD_IX, qc_move_32_pd_ix);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_DI_IX, qc_move_32_di_ix);
     qc!(MASK_OUT_X_Y, OP_MOVE_32_IX_IX, qc_move_32_ix_ix);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AW_IX, qc_move_32_aw_ix);
-    qc!(MASK_OUT_Y,   OP_MOVE_32_AL_IX, qc_move_32_al_ix);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AW_IX, qc_move_32_aw_ix);
+    qc!(MASK_OUT_Y, OP_MOVE_32_AL_IX, qc_move_32_al_ix);
 
     qc!(MASK_OUT_X, OP_MOVE_32_DN_AW, qc_move_32_dn_aw);
     qc!(MASK_OUT_X, OP_MOVE_32_AI_AW, qc_move_32_ai_aw);
@@ -1649,44 +1760,44 @@ mod tests {
     qc!(MASK_EXACT, OP_MOVE_32_AL_IMM, qc_move_32_al_imm);
 
     // Put qc for MOVEA here
-    qc!(MASK_OUT_X_Y, OP_MOVEA_16_DN,   qc_movea_16_dn);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_16_AN,   qc_movea_16_an);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_16_AI,   qc_movea_16_ai);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_16_PI,   qc_movea_16_pi);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_16_PD,   qc_movea_16_pd);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_16_DI,   qc_movea_16_di);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_16_IX,   qc_movea_16_ix);
-    qc!(MASK_OUT_X,   OP_MOVEA_16_AW,   qc_movea_16_aw);
-    qc!(MASK_OUT_X,   OP_MOVEA_16_AL,   qc_movea_16_al);
-    qc!(MASK_OUT_X,   OP_MOVEA_16_PCDI, qc_movea_16_pcdi);
-    qc!(MASK_OUT_X,   OP_MOVEA_16_PCIX, qc_movea_16_pcix);
-    qc!(MASK_OUT_X,   OP_MOVEA_16_IMM,  qc_movea_16_imm);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_16_DN, qc_movea_16_dn);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_16_AN, qc_movea_16_an);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_16_AI, qc_movea_16_ai);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_16_PI, qc_movea_16_pi);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_16_PD, qc_movea_16_pd);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_16_DI, qc_movea_16_di);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_16_IX, qc_movea_16_ix);
+    qc!(MASK_OUT_X, OP_MOVEA_16_AW, qc_movea_16_aw);
+    qc!(MASK_OUT_X, OP_MOVEA_16_AL, qc_movea_16_al);
+    qc!(MASK_OUT_X, OP_MOVEA_16_PCDI, qc_movea_16_pcdi);
+    qc!(MASK_OUT_X, OP_MOVEA_16_PCIX, qc_movea_16_pcix);
+    qc!(MASK_OUT_X, OP_MOVEA_16_IMM, qc_movea_16_imm);
 
-    qc!(MASK_OUT_X_Y, OP_MOVEA_32_DN,   qc_movea_32_dn);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_32_AN,   qc_movea_32_an);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_32_AI,   qc_movea_32_ai);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_32_PI,   qc_movea_32_pi);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_32_PD,   qc_movea_32_pd);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_32_DI,   qc_movea_32_di);
-    qc!(MASK_OUT_X_Y, OP_MOVEA_32_IX,   qc_movea_32_ix);
-    qc!(MASK_OUT_X,   OP_MOVEA_32_AW,   qc_movea_32_aw);
-    qc!(MASK_OUT_X,   OP_MOVEA_32_AL,   qc_movea_32_al);
-    qc!(MASK_OUT_X,   OP_MOVEA_32_PCDI, qc_movea_32_pcdi);
-    qc!(MASK_OUT_X,   OP_MOVEA_32_PCIX, qc_movea_32_pcix);
-    qc!(MASK_OUT_X,   OP_MOVEA_32_IMM,  qc_movea_32_imm);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_32_DN, qc_movea_32_dn);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_32_AN, qc_movea_32_an);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_32_AI, qc_movea_32_ai);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_32_PI, qc_movea_32_pi);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_32_PD, qc_movea_32_pd);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_32_DI, qc_movea_32_di);
+    qc!(MASK_OUT_X_Y, OP_MOVEA_32_IX, qc_movea_32_ix);
+    qc!(MASK_OUT_X, OP_MOVEA_32_AW, qc_movea_32_aw);
+    qc!(MASK_OUT_X, OP_MOVEA_32_AL, qc_movea_32_al);
+    qc!(MASK_OUT_X, OP_MOVEA_32_PCDI, qc_movea_32_pcdi);
+    qc!(MASK_OUT_X, OP_MOVEA_32_PCIX, qc_movea_32_pcix);
+    qc!(MASK_OUT_X, OP_MOVEA_32_IMM, qc_movea_32_imm);
 
     // Put qc for MOVE to CCR here
-    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_DN,   qc_move_16_toc_dn);
-    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_AI,   qc_move_16_toc_ai);
-    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_PI,   qc_move_16_toc_pi);
-    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_PD,   qc_move_16_toc_pd);
-    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_DI,   qc_move_16_toc_di);
-    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_IX,   qc_move_16_toc_ix);
-    qc!(MASK_EXACT, OP_MOVE_16_TOC_AW,   qc_move_16_toc_aw);
-    qc!(MASK_EXACT, OP_MOVE_16_TOC_AL,   qc_move_16_toc_al);
+    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_DN, qc_move_16_toc_dn);
+    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_AI, qc_move_16_toc_ai);
+    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_PI, qc_move_16_toc_pi);
+    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_PD, qc_move_16_toc_pd);
+    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_DI, qc_move_16_toc_di);
+    qc!(MASK_OUT_Y, OP_MOVE_16_TOC_IX, qc_move_16_toc_ix);
+    qc!(MASK_EXACT, OP_MOVE_16_TOC_AW, qc_move_16_toc_aw);
+    qc!(MASK_EXACT, OP_MOVE_16_TOC_AL, qc_move_16_toc_al);
     qc!(MASK_EXACT, OP_MOVE_16_TOC_PCDI, qc_move_16_toc_pcdi);
     qc!(MASK_EXACT, OP_MOVE_16_TOC_PCIX, qc_move_16_toc_pcix);
-    qc!(MASK_EXACT, OP_MOVE_16_TOC_IMM,  qc_move_16_toc_imm);
+    qc!(MASK_EXACT, OP_MOVE_16_TOC_IMM, qc_move_16_toc_imm);
 
     // Put qc for MOVE from SR here
     qc!(MASK_OUT_Y, OP_MOVE_16_FRS_DN, qc_move_16_frs_dn);
@@ -1716,35 +1827,35 @@ mod tests {
     qc!(MASK_OUT_Y, OP_MOVE_32_FRU, qc_move_32_fru);
 
     // Put qc for MOVEM here
-    qc!(MASK_OUT_Y, OP_MOVEM_16_RE_AI,   qc_movem_16_re_ai);
-    qc!(MASK_OUT_Y, OP_MOVEM_16_RE_PD,   qc_movem_16_re_pd);
-    qc!(MASK_OUT_Y, OP_MOVEM_16_RE_DI,   qc_movem_16_re_di);
-    qc!(MASK_OUT_Y, OP_MOVEM_16_RE_IX,   qc_movem_16_re_ix);
-    qc!(MASK_EXACT, OP_MOVEM_16_RE_AW,   qc_movem_16_re_aw);
-    qc!(MASK_EXACT, OP_MOVEM_16_RE_AL,   qc_movem_16_re_al);
+    qc!(MASK_OUT_Y, OP_MOVEM_16_RE_AI, qc_movem_16_re_ai);
+    qc!(MASK_OUT_Y, OP_MOVEM_16_RE_PD, qc_movem_16_re_pd);
+    qc!(MASK_OUT_Y, OP_MOVEM_16_RE_DI, qc_movem_16_re_di);
+    qc!(MASK_OUT_Y, OP_MOVEM_16_RE_IX, qc_movem_16_re_ix);
+    qc!(MASK_EXACT, OP_MOVEM_16_RE_AW, qc_movem_16_re_aw);
+    qc!(MASK_EXACT, OP_MOVEM_16_RE_AL, qc_movem_16_re_al);
 
-    qc!(MASK_OUT_Y, OP_MOVEM_16_ER_AI,   qc_movem_16_er_ai);
-    qc!(MASK_OUT_Y, OP_MOVEM_16_ER_PI,   qc_movem_16_er_pi);
-    qc!(MASK_OUT_Y, OP_MOVEM_16_ER_DI,   qc_movem_16_er_di);
-    qc!(MASK_OUT_Y, OP_MOVEM_16_ER_IX,   qc_movem_16_er_ix);
-    qc!(MASK_EXACT, OP_MOVEM_16_ER_AW,   qc_movem_16_er_aw);
-    qc!(MASK_EXACT, OP_MOVEM_16_ER_AL,   qc_movem_16_er_al);
+    qc!(MASK_OUT_Y, OP_MOVEM_16_ER_AI, qc_movem_16_er_ai);
+    qc!(MASK_OUT_Y, OP_MOVEM_16_ER_PI, qc_movem_16_er_pi);
+    qc!(MASK_OUT_Y, OP_MOVEM_16_ER_DI, qc_movem_16_er_di);
+    qc!(MASK_OUT_Y, OP_MOVEM_16_ER_IX, qc_movem_16_er_ix);
+    qc!(MASK_EXACT, OP_MOVEM_16_ER_AW, qc_movem_16_er_aw);
+    qc!(MASK_EXACT, OP_MOVEM_16_ER_AL, qc_movem_16_er_al);
     qc!(MASK_EXACT, OP_MOVEM_16_ER_PCDI, qc_movem_16_er_pcdi);
     qc!(MASK_EXACT, OP_MOVEM_16_ER_PCIX, qc_movem_16_er_pcix);
 
-    qc!(MASK_OUT_Y, OP_MOVEM_32_RE_AI,   qc_movem_32_re_ai);
-    qc!(MASK_OUT_Y, OP_MOVEM_32_RE_PD,   qc_movem_32_re_pd);
-    qc!(MASK_OUT_Y, OP_MOVEM_32_RE_DI,   qc_movem_32_re_di);
-    qc!(MASK_OUT_Y, OP_MOVEM_32_RE_IX,   qc_movem_32_re_ix);
-    qc!(MASK_EXACT, OP_MOVEM_32_RE_AW,   qc_movem_32_re_aw);
-    qc!(MASK_EXACT, OP_MOVEM_32_RE_AL,   qc_movem_32_re_al);
+    qc!(MASK_OUT_Y, OP_MOVEM_32_RE_AI, qc_movem_32_re_ai);
+    qc!(MASK_OUT_Y, OP_MOVEM_32_RE_PD, qc_movem_32_re_pd);
+    qc!(MASK_OUT_Y, OP_MOVEM_32_RE_DI, qc_movem_32_re_di);
+    qc!(MASK_OUT_Y, OP_MOVEM_32_RE_IX, qc_movem_32_re_ix);
+    qc!(MASK_EXACT, OP_MOVEM_32_RE_AW, qc_movem_32_re_aw);
+    qc!(MASK_EXACT, OP_MOVEM_32_RE_AL, qc_movem_32_re_al);
 
-    qc!(MASK_OUT_Y, OP_MOVEM_32_ER_AI,   qc_movem_32_er_ai);
-    qc!(MASK_OUT_Y, OP_MOVEM_32_ER_PI,   qc_movem_32_er_pi);
-    qc!(MASK_OUT_Y, OP_MOVEM_32_ER_DI,   qc_movem_32_er_di);
-    qc!(MASK_OUT_Y, OP_MOVEM_32_ER_IX,   qc_movem_32_er_ix);
-    qc!(MASK_EXACT, OP_MOVEM_32_ER_AW,   qc_movem_32_er_aw);
-    qc!(MASK_EXACT, OP_MOVEM_32_ER_AL,   qc_movem_32_er_al);
+    qc!(MASK_OUT_Y, OP_MOVEM_32_ER_AI, qc_movem_32_er_ai);
+    qc!(MASK_OUT_Y, OP_MOVEM_32_ER_PI, qc_movem_32_er_pi);
+    qc!(MASK_OUT_Y, OP_MOVEM_32_ER_DI, qc_movem_32_er_di);
+    qc!(MASK_OUT_Y, OP_MOVEM_32_ER_IX, qc_movem_32_er_ix);
+    qc!(MASK_EXACT, OP_MOVEM_32_ER_AW, qc_movem_32_er_aw);
+    qc!(MASK_EXACT, OP_MOVEM_32_ER_AL, qc_movem_32_er_al);
     qc!(MASK_EXACT, OP_MOVEM_32_ER_PCDI, qc_movem_32_er_pcdi);
     qc!(MASK_EXACT, OP_MOVEM_32_ER_PCIX, qc_movem_32_er_pcix);
 
@@ -1759,30 +1870,30 @@ mod tests {
     qc!(MASK_LOBYTX_QUICKER, OP_MOVEQ_32, qc_moveq_32);
 
     // Put qc for MULS here
-    qc!(MASK_OUT_X_Y, OP_MULS_16_DN,   qc_muls_16_dn);
-    qc!(MASK_OUT_X_Y, OP_MULS_16_AI,   qc_muls_16_ai);
-    qc!(MASK_OUT_X_Y, OP_MULS_16_PI,   qc_muls_16_pi);
-    qc!(MASK_OUT_X_Y, OP_MULS_16_PD,   qc_muls_16_pd);
-    qc!(MASK_OUT_X_Y, OP_MULS_16_DI,   qc_muls_16_di);
-    qc!(MASK_OUT_X_Y, OP_MULS_16_IX,   qc_muls_16_ix);
-    qc!(MASK_OUT_X,   OP_MULS_16_AW,   qc_muls_16_aw);
-    qc!(MASK_OUT_X,   OP_MULS_16_AL,   qc_muls_16_al);
-    qc!(MASK_OUT_X,   OP_MULS_16_PCDI, qc_muls_16_pcdi);
-    qc!(MASK_OUT_X,   OP_MULS_16_PCIX, qc_muls_16_pcix);
-    qc!(MASK_OUT_X,   OP_MULS_16_IMM,  qc_muls_16_imm);
+    qc!(MASK_OUT_X_Y, OP_MULS_16_DN, qc_muls_16_dn);
+    qc!(MASK_OUT_X_Y, OP_MULS_16_AI, qc_muls_16_ai);
+    qc!(MASK_OUT_X_Y, OP_MULS_16_PI, qc_muls_16_pi);
+    qc!(MASK_OUT_X_Y, OP_MULS_16_PD, qc_muls_16_pd);
+    qc!(MASK_OUT_X_Y, OP_MULS_16_DI, qc_muls_16_di);
+    qc!(MASK_OUT_X_Y, OP_MULS_16_IX, qc_muls_16_ix);
+    qc!(MASK_OUT_X, OP_MULS_16_AW, qc_muls_16_aw);
+    qc!(MASK_OUT_X, OP_MULS_16_AL, qc_muls_16_al);
+    qc!(MASK_OUT_X, OP_MULS_16_PCDI, qc_muls_16_pcdi);
+    qc!(MASK_OUT_X, OP_MULS_16_PCIX, qc_muls_16_pcix);
+    qc!(MASK_OUT_X, OP_MULS_16_IMM, qc_muls_16_imm);
 
     // Put qc for MULU here
-    qc!(MASK_OUT_X_Y, OP_MULU_16_DN,   qc_mulu_16_dn);
-    qc!(MASK_OUT_X_Y, OP_MULU_16_AI,   qc_mulu_16_ai);
-    qc!(MASK_OUT_X_Y, OP_MULU_16_PI,   qc_mulu_16_pi);
-    qc!(MASK_OUT_X_Y, OP_MULU_16_PD,   qc_mulu_16_pd);
-    qc!(MASK_OUT_X_Y, OP_MULU_16_DI,   qc_mulu_16_di);
-    qc!(MASK_OUT_X_Y, OP_MULU_16_IX,   qc_mulu_16_ix);
-    qc!(MASK_OUT_X,   OP_MULU_16_AW,   qc_mulu_16_aw);
-    qc!(MASK_OUT_X,   OP_MULU_16_AL,   qc_mulu_16_al);
-    qc!(MASK_OUT_X,   OP_MULU_16_PCDI, qc_mulu_16_pcdi);
-    qc!(MASK_OUT_X,   OP_MULU_16_PCIX, qc_mulu_16_pcix);
-    qc!(MASK_OUT_X,   OP_MULU_16_IMM,  qc_mulu_16_imm);
+    qc!(MASK_OUT_X_Y, OP_MULU_16_DN, qc_mulu_16_dn);
+    qc!(MASK_OUT_X_Y, OP_MULU_16_AI, qc_mulu_16_ai);
+    qc!(MASK_OUT_X_Y, OP_MULU_16_PI, qc_mulu_16_pi);
+    qc!(MASK_OUT_X_Y, OP_MULU_16_PD, qc_mulu_16_pd);
+    qc!(MASK_OUT_X_Y, OP_MULU_16_DI, qc_mulu_16_di);
+    qc!(MASK_OUT_X_Y, OP_MULU_16_IX, qc_mulu_16_ix);
+    qc!(MASK_OUT_X, OP_MULU_16_AW, qc_mulu_16_aw);
+    qc!(MASK_OUT_X, OP_MULU_16_AL, qc_mulu_16_al);
+    qc!(MASK_OUT_X, OP_MULU_16_PCDI, qc_mulu_16_pcdi);
+    qc!(MASK_OUT_X, OP_MULU_16_PCIX, qc_mulu_16_pcix);
+    qc!(MASK_OUT_X, OP_MULU_16_IMM, qc_mulu_16_imm);
 
     // Put qc for NBCD here
     qc!(MASK_OUT_Y, OP_NBCD_8_DN, qc_nbcd_8_dn);
@@ -1882,106 +1993,106 @@ mod tests {
     qc!(MASK_EXACT, OP_NOT_32_AL, qc_not_32_al);
 
     // Put qc for OR here
-    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_DN,   qc_or_8_er_dn);
-    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_AI,   qc_or_8_er_ai);
-    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_PI,   qc_or_8_er_pi);
-    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_PD,   qc_or_8_er_pd);
-    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_DI,   qc_or_8_er_di);
-    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_IX,   qc_or_8_er_ix);
-    qc8!(MASK_OUT_X,   OP_OR_8_ER_AW,   qc_or_8_er_aw);
-    qc8!(MASK_OUT_X,   OP_OR_8_ER_AL,   qc_or_8_er_al);
-    qc8!(MASK_OUT_X,   OP_OR_8_ER_PCDI, qc_or_8_er_pcdi);
-    qc8!(MASK_OUT_X,   OP_OR_8_ER_PCIX, qc_or_8_er_pcix);
-    qc8!(MASK_OUT_X,   OP_OR_8_ER_IMM,  qc_or_8_er_imm);
+    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_DN, qc_or_8_er_dn);
+    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_AI, qc_or_8_er_ai);
+    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_PI, qc_or_8_er_pi);
+    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_PD, qc_or_8_er_pd);
+    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_DI, qc_or_8_er_di);
+    qc8!(MASK_OUT_X_Y, OP_OR_8_ER_IX, qc_or_8_er_ix);
+    qc8!(MASK_OUT_X, OP_OR_8_ER_AW, qc_or_8_er_aw);
+    qc8!(MASK_OUT_X, OP_OR_8_ER_AL, qc_or_8_er_al);
+    qc8!(MASK_OUT_X, OP_OR_8_ER_PCDI, qc_or_8_er_pcdi);
+    qc8!(MASK_OUT_X, OP_OR_8_ER_PCIX, qc_or_8_er_pcix);
+    qc8!(MASK_OUT_X, OP_OR_8_ER_IMM, qc_or_8_er_imm);
 
-    qc8!(MASK_OUT_X_Y, OP_OR_8_RE_AI,   qc_or_8_re_ai);
-    qc8!(MASK_OUT_X_Y, OP_OR_8_RE_PI,   qc_or_8_re_pi);
-    qc8!(MASK_OUT_X_Y, OP_OR_8_RE_PD,   qc_or_8_re_pd);
-    qc8!(MASK_OUT_X_Y, OP_OR_8_RE_DI,   qc_or_8_re_di);
-    qc8!(MASK_OUT_X_Y, OP_OR_8_RE_IX,   qc_or_8_re_ix);
-    qc8!(MASK_OUT_X,   OP_OR_8_RE_AW,   qc_or_8_re_aw);
-    qc8!(MASK_OUT_X,   OP_OR_8_RE_AL,   qc_or_8_re_al);
+    qc8!(MASK_OUT_X_Y, OP_OR_8_RE_AI, qc_or_8_re_ai);
+    qc8!(MASK_OUT_X_Y, OP_OR_8_RE_PI, qc_or_8_re_pi);
+    qc8!(MASK_OUT_X_Y, OP_OR_8_RE_PD, qc_or_8_re_pd);
+    qc8!(MASK_OUT_X_Y, OP_OR_8_RE_DI, qc_or_8_re_di);
+    qc8!(MASK_OUT_X_Y, OP_OR_8_RE_IX, qc_or_8_re_ix);
+    qc8!(MASK_OUT_X, OP_OR_8_RE_AW, qc_or_8_re_aw);
+    qc8!(MASK_OUT_X, OP_OR_8_RE_AL, qc_or_8_re_al);
 
-    qc!(MASK_OUT_X_Y, OP_OR_16_ER_DN,   qc_or_16_er_dn);
-    qc!(MASK_OUT_X_Y, OP_OR_16_ER_AI,   qc_or_16_er_ai);
-    qc!(MASK_OUT_X_Y, OP_OR_16_ER_PI,   qc_or_16_er_pi);
-    qc!(MASK_OUT_X_Y, OP_OR_16_ER_PD,   qc_or_16_er_pd);
-    qc!(MASK_OUT_X_Y, OP_OR_16_ER_DI,   qc_or_16_er_di);
-    qc!(MASK_OUT_X_Y, OP_OR_16_ER_IX,   qc_or_16_er_ix);
-    qc!(MASK_OUT_X,   OP_OR_16_ER_AW,   qc_or_16_er_aw);
-    qc!(MASK_OUT_X,   OP_OR_16_ER_AL,   qc_or_16_er_al);
-    qc!(MASK_OUT_X,   OP_OR_16_ER_PCDI, qc_or_16_er_pcdi);
-    qc!(MASK_OUT_X,   OP_OR_16_ER_PCIX, qc_or_16_er_pcix);
-    qc!(MASK_OUT_X,   OP_OR_16_ER_IMM,  qc_or_16_er_imm);
+    qc!(MASK_OUT_X_Y, OP_OR_16_ER_DN, qc_or_16_er_dn);
+    qc!(MASK_OUT_X_Y, OP_OR_16_ER_AI, qc_or_16_er_ai);
+    qc!(MASK_OUT_X_Y, OP_OR_16_ER_PI, qc_or_16_er_pi);
+    qc!(MASK_OUT_X_Y, OP_OR_16_ER_PD, qc_or_16_er_pd);
+    qc!(MASK_OUT_X_Y, OP_OR_16_ER_DI, qc_or_16_er_di);
+    qc!(MASK_OUT_X_Y, OP_OR_16_ER_IX, qc_or_16_er_ix);
+    qc!(MASK_OUT_X, OP_OR_16_ER_AW, qc_or_16_er_aw);
+    qc!(MASK_OUT_X, OP_OR_16_ER_AL, qc_or_16_er_al);
+    qc!(MASK_OUT_X, OP_OR_16_ER_PCDI, qc_or_16_er_pcdi);
+    qc!(MASK_OUT_X, OP_OR_16_ER_PCIX, qc_or_16_er_pcix);
+    qc!(MASK_OUT_X, OP_OR_16_ER_IMM, qc_or_16_er_imm);
 
-    qc!(MASK_OUT_X_Y, OP_OR_16_RE_AI,   qc_or_16_re_ai);
-    qc!(MASK_OUT_X_Y, OP_OR_16_RE_PI,   qc_or_16_re_pi);
-    qc!(MASK_OUT_X_Y, OP_OR_16_RE_PD,   qc_or_16_re_pd);
-    qc!(MASK_OUT_X_Y, OP_OR_16_RE_DI,   qc_or_16_re_di);
-    qc!(MASK_OUT_X_Y, OP_OR_16_RE_IX,   qc_or_16_re_ix);
-    qc!(MASK_OUT_X,   OP_OR_16_RE_AW,   qc_or_16_re_aw);
-    qc!(MASK_OUT_X,   OP_OR_16_RE_AL,   qc_or_16_re_al);
+    qc!(MASK_OUT_X_Y, OP_OR_16_RE_AI, qc_or_16_re_ai);
+    qc!(MASK_OUT_X_Y, OP_OR_16_RE_PI, qc_or_16_re_pi);
+    qc!(MASK_OUT_X_Y, OP_OR_16_RE_PD, qc_or_16_re_pd);
+    qc!(MASK_OUT_X_Y, OP_OR_16_RE_DI, qc_or_16_re_di);
+    qc!(MASK_OUT_X_Y, OP_OR_16_RE_IX, qc_or_16_re_ix);
+    qc!(MASK_OUT_X, OP_OR_16_RE_AW, qc_or_16_re_aw);
+    qc!(MASK_OUT_X, OP_OR_16_RE_AL, qc_or_16_re_al);
 
-    qc!(MASK_OUT_X_Y, OP_OR_32_ER_DN,   qc_or_32_er_dn);
-    qc!(MASK_OUT_X_Y, OP_OR_32_ER_AI,   qc_or_32_er_ai);
-    qc!(MASK_OUT_X_Y, OP_OR_32_ER_PI,   qc_or_32_er_pi);
-    qc!(MASK_OUT_X_Y, OP_OR_32_ER_PD,   qc_or_32_er_pd);
-    qc!(MASK_OUT_X_Y, OP_OR_32_ER_DI,   qc_or_32_er_di);
-    qc!(MASK_OUT_X_Y, OP_OR_32_ER_IX,   qc_or_32_er_ix);
-    qc!(MASK_OUT_X,   OP_OR_32_ER_AW,   qc_or_32_er_aw);
-    qc!(MASK_OUT_X,   OP_OR_32_ER_AL,   qc_or_32_er_al);
-    qc!(MASK_OUT_X,   OP_OR_32_ER_PCDI, qc_or_32_er_pcdi);
-    qc!(MASK_OUT_X,   OP_OR_32_ER_PCIX, qc_or_32_er_pcix);
-    qc!(MASK_OUT_X,   OP_OR_32_ER_IMM,  qc_or_32_er_imm);
+    qc!(MASK_OUT_X_Y, OP_OR_32_ER_DN, qc_or_32_er_dn);
+    qc!(MASK_OUT_X_Y, OP_OR_32_ER_AI, qc_or_32_er_ai);
+    qc!(MASK_OUT_X_Y, OP_OR_32_ER_PI, qc_or_32_er_pi);
+    qc!(MASK_OUT_X_Y, OP_OR_32_ER_PD, qc_or_32_er_pd);
+    qc!(MASK_OUT_X_Y, OP_OR_32_ER_DI, qc_or_32_er_di);
+    qc!(MASK_OUT_X_Y, OP_OR_32_ER_IX, qc_or_32_er_ix);
+    qc!(MASK_OUT_X, OP_OR_32_ER_AW, qc_or_32_er_aw);
+    qc!(MASK_OUT_X, OP_OR_32_ER_AL, qc_or_32_er_al);
+    qc!(MASK_OUT_X, OP_OR_32_ER_PCDI, qc_or_32_er_pcdi);
+    qc!(MASK_OUT_X, OP_OR_32_ER_PCIX, qc_or_32_er_pcix);
+    qc!(MASK_OUT_X, OP_OR_32_ER_IMM, qc_or_32_er_imm);
 
-    qc!(MASK_OUT_X_Y, OP_OR_32_RE_AI,   qc_or_32_re_ai);
-    qc!(MASK_OUT_X_Y, OP_OR_32_RE_PI,   qc_or_32_re_pi);
-    qc!(MASK_OUT_X_Y, OP_OR_32_RE_PD,   qc_or_32_re_pd);
-    qc!(MASK_OUT_X_Y, OP_OR_32_RE_DI,   qc_or_32_re_di);
-    qc!(MASK_OUT_X_Y, OP_OR_32_RE_IX,   qc_or_32_re_ix);
-    qc!(MASK_OUT_X,   OP_OR_32_RE_AW,   qc_or_32_re_aw);
-    qc!(MASK_OUT_X,   OP_OR_32_RE_AL,   qc_or_32_re_al);
+    qc!(MASK_OUT_X_Y, OP_OR_32_RE_AI, qc_or_32_re_ai);
+    qc!(MASK_OUT_X_Y, OP_OR_32_RE_PI, qc_or_32_re_pi);
+    qc!(MASK_OUT_X_Y, OP_OR_32_RE_PD, qc_or_32_re_pd);
+    qc!(MASK_OUT_X_Y, OP_OR_32_RE_DI, qc_or_32_re_di);
+    qc!(MASK_OUT_X_Y, OP_OR_32_RE_IX, qc_or_32_re_ix);
+    qc!(MASK_OUT_X, OP_OR_32_RE_AW, qc_or_32_re_aw);
+    qc!(MASK_OUT_X, OP_OR_32_RE_AL, qc_or_32_re_al);
 
     // Put qc for ORI here
-    qc8!(MASK_OUT_Y, OP_ORI_8_DN,   qc_ori_8_dn);
-    qc8!(MASK_OUT_Y, OP_ORI_8_AI,   qc_ori_8_ai);
-    qc8!(MASK_OUT_Y, OP_ORI_8_PI,   qc_ori_8_pi);
-    qc8!(MASK_OUT_Y, OP_ORI_8_PD,   qc_ori_8_pd);
-    qc8!(MASK_OUT_Y, OP_ORI_8_DI,   qc_ori_8_di);
-    qc8!(MASK_OUT_Y, OP_ORI_8_IX,   qc_ori_8_ix);
-    qc8!(MASK_EXACT, OP_ORI_8_AW,   qc_ori_8_aw);
-    qc8!(MASK_EXACT, OP_ORI_8_AL,   qc_ori_8_al);
+    qc8!(MASK_OUT_Y, OP_ORI_8_DN, qc_ori_8_dn);
+    qc8!(MASK_OUT_Y, OP_ORI_8_AI, qc_ori_8_ai);
+    qc8!(MASK_OUT_Y, OP_ORI_8_PI, qc_ori_8_pi);
+    qc8!(MASK_OUT_Y, OP_ORI_8_PD, qc_ori_8_pd);
+    qc8!(MASK_OUT_Y, OP_ORI_8_DI, qc_ori_8_di);
+    qc8!(MASK_OUT_Y, OP_ORI_8_IX, qc_ori_8_ix);
+    qc8!(MASK_EXACT, OP_ORI_8_AW, qc_ori_8_aw);
+    qc8!(MASK_EXACT, OP_ORI_8_AL, qc_ori_8_al);
 
-    qc!(MASK_OUT_Y, OP_ORI_16_DN,   qc_ori_16_dn);
-    qc!(MASK_OUT_Y, OP_ORI_16_AI,   qc_ori_16_ai);
-    qc!(MASK_OUT_Y, OP_ORI_16_PI,   qc_ori_16_pi);
-    qc!(MASK_OUT_Y, OP_ORI_16_PD,   qc_ori_16_pd);
-    qc!(MASK_OUT_Y, OP_ORI_16_DI,   qc_ori_16_di);
-    qc!(MASK_OUT_Y, OP_ORI_16_IX,   qc_ori_16_ix);
-    qc!(MASK_EXACT, OP_ORI_16_AW,   qc_ori_16_aw);
-    qc!(MASK_EXACT, OP_ORI_16_AL,   qc_ori_16_al);
+    qc!(MASK_OUT_Y, OP_ORI_16_DN, qc_ori_16_dn);
+    qc!(MASK_OUT_Y, OP_ORI_16_AI, qc_ori_16_ai);
+    qc!(MASK_OUT_Y, OP_ORI_16_PI, qc_ori_16_pi);
+    qc!(MASK_OUT_Y, OP_ORI_16_PD, qc_ori_16_pd);
+    qc!(MASK_OUT_Y, OP_ORI_16_DI, qc_ori_16_di);
+    qc!(MASK_OUT_Y, OP_ORI_16_IX, qc_ori_16_ix);
+    qc!(MASK_EXACT, OP_ORI_16_AW, qc_ori_16_aw);
+    qc!(MASK_EXACT, OP_ORI_16_AL, qc_ori_16_al);
 
-    qc!(MASK_OUT_Y, OP_ORI_32_DN,   qc_ori_32_dn);
-    qc!(MASK_OUT_Y, OP_ORI_32_AI,   qc_ori_32_ai);
-    qc!(MASK_OUT_Y, OP_ORI_32_PI,   qc_ori_32_pi);
-    qc!(MASK_OUT_Y, OP_ORI_32_PD,   qc_ori_32_pd);
-    qc!(MASK_OUT_Y, OP_ORI_32_DI,   qc_ori_32_di);
-    qc!(MASK_OUT_Y, OP_ORI_32_IX,   qc_ori_32_ix);
-    qc!(MASK_EXACT, OP_ORI_32_AW,   qc_ori_32_aw);
-    qc!(MASK_EXACT, OP_ORI_32_AL,   qc_ori_32_al);
+    qc!(MASK_OUT_Y, OP_ORI_32_DN, qc_ori_32_dn);
+    qc!(MASK_OUT_Y, OP_ORI_32_AI, qc_ori_32_ai);
+    qc!(MASK_OUT_Y, OP_ORI_32_PI, qc_ori_32_pi);
+    qc!(MASK_OUT_Y, OP_ORI_32_PD, qc_ori_32_pd);
+    qc!(MASK_OUT_Y, OP_ORI_32_DI, qc_ori_32_di);
+    qc!(MASK_OUT_Y, OP_ORI_32_IX, qc_ori_32_ix);
+    qc!(MASK_EXACT, OP_ORI_32_AW, qc_ori_32_aw);
+    qc!(MASK_EXACT, OP_ORI_32_AL, qc_ori_32_al);
 
     // Put qc for ORI to CCR here
-    qc8!(MASK_EXACT, OP_ORI_8_TOC,  qc_ori_8_toc);
+    qc8!(MASK_EXACT, OP_ORI_8_TOC, qc_ori_8_toc);
 
     // Put qc for ORI to SR here
-    qc8!(MASK_EXACT, OP_ORI_16_TOS,  qc_ori_16_tos);
+    qc8!(MASK_EXACT, OP_ORI_16_TOS, qc_ori_16_tos);
 
     // Put qc for PEA here
-    qc!(MASK_OUT_Y, OP_PEA_32_AI,   qc_pea_32_ai);
-    qc!(MASK_OUT_Y, OP_PEA_32_DI,   qc_pea_32_di);
-    qc!(MASK_OUT_Y, OP_PEA_32_IX,   qc_pea_32_ix);
-    qc!(MASK_EXACT, OP_PEA_32_AW,   qc_pea_32_aw);
-    qc!(MASK_EXACT, OP_PEA_32_AL,   qc_pea_32_al);
+    qc!(MASK_OUT_Y, OP_PEA_32_AI, qc_pea_32_ai);
+    qc!(MASK_OUT_Y, OP_PEA_32_DI, qc_pea_32_di);
+    qc!(MASK_OUT_Y, OP_PEA_32_IX, qc_pea_32_ix);
+    qc!(MASK_EXACT, OP_PEA_32_AW, qc_pea_32_aw);
+    qc!(MASK_EXACT, OP_PEA_32_AL, qc_pea_32_al);
     qc!(MASK_EXACT, OP_PEA_32_PCDI, qc_pea_32_pcdi);
     qc!(MASK_EXACT, OP_PEA_32_PCIX, qc_pea_32_pcix);
 
@@ -2413,73 +2524,73 @@ mod tests {
     qc!(MASK_OUT_Y, OP_UNLK_32, qc_unlk_32);
 
     // OP completeness test, run once through every opcode
-    const BLOCK_MASK : u32 = 0b1111_1100_0000_0000;
-    const BLOCK_SIZE : u32 = 0b0000_0100_0000_0000;
+    const BLOCK_MASK: u32 = 0b1111_1100_0000_0000;
+    const BLOCK_SIZE: u32 = 0b0000_0100_0000_0000;
 
-    const BLOCK_0K : u32 = 0 * BLOCK_SIZE;
-    const BLOCK_1K : u32 = 1 * BLOCK_SIZE;
-    const BLOCK_2K : u32 = 2 * BLOCK_SIZE;
-    const BLOCK_3K : u32 = 3 * BLOCK_SIZE;
-    const BLOCK_4K : u32 = 4 * BLOCK_SIZE;
-    const BLOCK_5K : u32 = 5 * BLOCK_SIZE;
-    const BLOCK_6K : u32 = 6 * BLOCK_SIZE;
-    const BLOCK_7K : u32 = 7 * BLOCK_SIZE;
-    const BLOCK_8K : u32 = 8 * BLOCK_SIZE;
-    const BLOCK_9K : u32 = 9 * BLOCK_SIZE;
-    const BLOCK_10K : u32 = 10 * BLOCK_SIZE;
-    const BLOCK_11K : u32 = 11 * BLOCK_SIZE;
-    const BLOCK_12K : u32 = 12 * BLOCK_SIZE;
-    const BLOCK_13K : u32 = 13 * BLOCK_SIZE;
-    const BLOCK_14K : u32 = 14 * BLOCK_SIZE;
-    const BLOCK_15K : u32 = 15 * BLOCK_SIZE;
-    const BLOCK_16K : u32 = 16 * BLOCK_SIZE;
-    const BLOCK_17K : u32 = 17 * BLOCK_SIZE;
-    const BLOCK_18K : u32 = 18 * BLOCK_SIZE;
-    const BLOCK_19K : u32 = 19 * BLOCK_SIZE;
-    const BLOCK_20K : u32 = 20 * BLOCK_SIZE;
-    const BLOCK_21K : u32 = 21 * BLOCK_SIZE;
-    const BLOCK_22K : u32 = 22 * BLOCK_SIZE;
-    const BLOCK_23K : u32 = 23 * BLOCK_SIZE;
-    const BLOCK_24K : u32 = 24 * BLOCK_SIZE;
-    const BLOCK_25K : u32 = 25 * BLOCK_SIZE;
-    const BLOCK_26K : u32 = 26 * BLOCK_SIZE;
-    const BLOCK_27K : u32 = 27 * BLOCK_SIZE;
-    const BLOCK_28K : u32 = 28 * BLOCK_SIZE;
-    const BLOCK_29K : u32 = 29 * BLOCK_SIZE;
-    const BLOCK_30K : u32 = 30 * BLOCK_SIZE;
-    const BLOCK_31K : u32 = 31 * BLOCK_SIZE;
-    const BLOCK_32K : u32 = 32 * BLOCK_SIZE;
-    const BLOCK_33K : u32 = 33 * BLOCK_SIZE;
-    const BLOCK_34K : u32 = 34 * BLOCK_SIZE;
-    const BLOCK_35K : u32 = 35 * BLOCK_SIZE;
-    const BLOCK_36K : u32 = 36 * BLOCK_SIZE;
-    const BLOCK_37K : u32 = 37 * BLOCK_SIZE;
-    const BLOCK_38K : u32 = 38 * BLOCK_SIZE;
-    const BLOCK_39K : u32 = 39 * BLOCK_SIZE;
-    const BLOCK_40K : u32 = 40 * BLOCK_SIZE;
-    const BLOCK_41K : u32 = 41 * BLOCK_SIZE;
-    const BLOCK_42K : u32 = 42 * BLOCK_SIZE;
-    const BLOCK_43K : u32 = 43 * BLOCK_SIZE;
-    const BLOCK_44K : u32 = 44 * BLOCK_SIZE;
-    const BLOCK_45K : u32 = 45 * BLOCK_SIZE;
-    const BLOCK_46K : u32 = 46 * BLOCK_SIZE;
-    const BLOCK_47K : u32 = 47 * BLOCK_SIZE;
-    const BLOCK_48K : u32 = 48 * BLOCK_SIZE;
-    const BLOCK_49K : u32 = 49 * BLOCK_SIZE;
-    const BLOCK_50K : u32 = 50 * BLOCK_SIZE;
-    const BLOCK_51K : u32 = 51 * BLOCK_SIZE;
-    const BLOCK_52K : u32 = 52 * BLOCK_SIZE;
-    const BLOCK_53K : u32 = 53 * BLOCK_SIZE;
-    const BLOCK_54K : u32 = 54 * BLOCK_SIZE;
-    const BLOCK_55K : u32 = 55 * BLOCK_SIZE;
-    const BLOCK_56K : u32 = 56 * BLOCK_SIZE;
-    const BLOCK_57K : u32 = 57 * BLOCK_SIZE;
-    const BLOCK_58K : u32 = 58 * BLOCK_SIZE;
-    const BLOCK_59K : u32 = 59 * BLOCK_SIZE;
-    const BLOCK_60K : u32 = 60 * BLOCK_SIZE;
-    const BLOCK_61K : u32 = 61 * BLOCK_SIZE;
-    const BLOCK_62K : u32 = 62 * BLOCK_SIZE;
-    const BLOCK_63K : u32 = 63 * BLOCK_SIZE;
+    const BLOCK_0K: u32 = 0 * BLOCK_SIZE;
+    const BLOCK_1K: u32 = 1 * BLOCK_SIZE;
+    const BLOCK_2K: u32 = 2 * BLOCK_SIZE;
+    const BLOCK_3K: u32 = 3 * BLOCK_SIZE;
+    const BLOCK_4K: u32 = 4 * BLOCK_SIZE;
+    const BLOCK_5K: u32 = 5 * BLOCK_SIZE;
+    const BLOCK_6K: u32 = 6 * BLOCK_SIZE;
+    const BLOCK_7K: u32 = 7 * BLOCK_SIZE;
+    const BLOCK_8K: u32 = 8 * BLOCK_SIZE;
+    const BLOCK_9K: u32 = 9 * BLOCK_SIZE;
+    const BLOCK_10K: u32 = 10 * BLOCK_SIZE;
+    const BLOCK_11K: u32 = 11 * BLOCK_SIZE;
+    const BLOCK_12K: u32 = 12 * BLOCK_SIZE;
+    const BLOCK_13K: u32 = 13 * BLOCK_SIZE;
+    const BLOCK_14K: u32 = 14 * BLOCK_SIZE;
+    const BLOCK_15K: u32 = 15 * BLOCK_SIZE;
+    const BLOCK_16K: u32 = 16 * BLOCK_SIZE;
+    const BLOCK_17K: u32 = 17 * BLOCK_SIZE;
+    const BLOCK_18K: u32 = 18 * BLOCK_SIZE;
+    const BLOCK_19K: u32 = 19 * BLOCK_SIZE;
+    const BLOCK_20K: u32 = 20 * BLOCK_SIZE;
+    const BLOCK_21K: u32 = 21 * BLOCK_SIZE;
+    const BLOCK_22K: u32 = 22 * BLOCK_SIZE;
+    const BLOCK_23K: u32 = 23 * BLOCK_SIZE;
+    const BLOCK_24K: u32 = 24 * BLOCK_SIZE;
+    const BLOCK_25K: u32 = 25 * BLOCK_SIZE;
+    const BLOCK_26K: u32 = 26 * BLOCK_SIZE;
+    const BLOCK_27K: u32 = 27 * BLOCK_SIZE;
+    const BLOCK_28K: u32 = 28 * BLOCK_SIZE;
+    const BLOCK_29K: u32 = 29 * BLOCK_SIZE;
+    const BLOCK_30K: u32 = 30 * BLOCK_SIZE;
+    const BLOCK_31K: u32 = 31 * BLOCK_SIZE;
+    const BLOCK_32K: u32 = 32 * BLOCK_SIZE;
+    const BLOCK_33K: u32 = 33 * BLOCK_SIZE;
+    const BLOCK_34K: u32 = 34 * BLOCK_SIZE;
+    const BLOCK_35K: u32 = 35 * BLOCK_SIZE;
+    const BLOCK_36K: u32 = 36 * BLOCK_SIZE;
+    const BLOCK_37K: u32 = 37 * BLOCK_SIZE;
+    const BLOCK_38K: u32 = 38 * BLOCK_SIZE;
+    const BLOCK_39K: u32 = 39 * BLOCK_SIZE;
+    const BLOCK_40K: u32 = 40 * BLOCK_SIZE;
+    const BLOCK_41K: u32 = 41 * BLOCK_SIZE;
+    const BLOCK_42K: u32 = 42 * BLOCK_SIZE;
+    const BLOCK_43K: u32 = 43 * BLOCK_SIZE;
+    const BLOCK_44K: u32 = 44 * BLOCK_SIZE;
+    const BLOCK_45K: u32 = 45 * BLOCK_SIZE;
+    const BLOCK_46K: u32 = 46 * BLOCK_SIZE;
+    const BLOCK_47K: u32 = 47 * BLOCK_SIZE;
+    const BLOCK_48K: u32 = 48 * BLOCK_SIZE;
+    const BLOCK_49K: u32 = 49 * BLOCK_SIZE;
+    const BLOCK_50K: u32 = 50 * BLOCK_SIZE;
+    const BLOCK_51K: u32 = 51 * BLOCK_SIZE;
+    const BLOCK_52K: u32 = 52 * BLOCK_SIZE;
+    const BLOCK_53K: u32 = 53 * BLOCK_SIZE;
+    const BLOCK_54K: u32 = 54 * BLOCK_SIZE;
+    const BLOCK_55K: u32 = 55 * BLOCK_SIZE;
+    const BLOCK_56K: u32 = 56 * BLOCK_SIZE;
+    const BLOCK_57K: u32 = 57 * BLOCK_SIZE;
+    const BLOCK_58K: u32 = 58 * BLOCK_SIZE;
+    const BLOCK_59K: u32 = 59 * BLOCK_SIZE;
+    const BLOCK_60K: u32 = 60 * BLOCK_SIZE;
+    const BLOCK_61K: u32 = 61 * BLOCK_SIZE;
+    const BLOCK_62K: u32 = 62 * BLOCK_SIZE;
+    const BLOCK_63K: u32 = 63 * BLOCK_SIZE;
 
     qc_allow_exception!(BLOCK_MASK, BLOCK_0K, qc_block0k);
     qc_allow_exception!(BLOCK_MASK, BLOCK_1K, qc_block1k);
@@ -2547,50 +2658,79 @@ mod tests {
     qc_allow_exception!(BLOCK_MASK, BLOCK_63K, qc_block63k);
 
     macro_rules! core_eq {
-        ($left:ident , $right:ident . $field:ident [ $index:expr ]) => ({
+        ($left:ident , $right:ident . $field:ident [ $index:expr ]) => {{
             match (&($left.$field[$index]), &($right.$field[$index])) {
                 (left_val, right_val) => {
                     if !(*left_val == *right_val) {
-                        println!("core incoherence: `{}[{}]` differs \
-                               ({}: `0x{:x}`, {}: `0x{:x}`)", stringify!($field), $index, stringify!($left), left_val, stringify!($right), right_val);
+                        println!(
+                            "core incoherence: `{}[{}]` differs \
+                               ({}: `0x{:x}`, {}: `0x{:x}`)",
+                            stringify!($field),
+                            $index,
+                            stringify!($left),
+                            left_val,
+                            stringify!($right),
+                            right_val
+                        );
                         return false;
                     }
                 }
             }
-        });
-        ($left:ident , $right:ident . $field:ident () ?) => ({
+        }};
+        ($left:ident , $right:ident . $field:ident () ?) => {{
             match (&($left.$field()), &($right.$field())) {
                 (left_val, right_val) => {
                     if !(*left_val == *right_val) {
-                        println!("core incoherence: `{}()` differs \
-                               ({}: `{:?}`, {}: `{:?}`)", stringify!($field), stringify!($left), left_val, stringify!($right), right_val);
+                        println!(
+                            "core incoherence: `{}()` differs \
+                               ({}: `{:?}`, {}: `{:?}`)",
+                            stringify!($field),
+                            stringify!($left),
+                            left_val,
+                            stringify!($right),
+                            right_val
+                        );
                         return false;
                     }
                 }
             }
-        });
-        ($left:ident , $right:ident . $field:ident ()) => ({
+        }};
+        ($left:ident , $right:ident . $field:ident ()) => {{
             match (&($left.$field()), &($right.$field())) {
                 (left_val, right_val) => {
                     if !(*left_val == *right_val) {
-                        println!("core incoherence: `{}()` differs \
-                               ({}: `0x{:x}`, {}: `0x{:x}`)", stringify!($field), stringify!($left), left_val, stringify!($right), right_val);
+                        println!(
+                            "core incoherence: `{}()` differs \
+                               ({}: `0x{:x}`, {}: `0x{:x}`)",
+                            stringify!($field),
+                            stringify!($left),
+                            left_val,
+                            stringify!($right),
+                            right_val
+                        );
                         return false;
                     }
                 }
             }
-        });
-        ($left:ident , $right:ident . $field:ident) => ({
+        }};
+        ($left:ident , $right:ident . $field:ident) => {{
             match (&($left.$field), &($right.$field)) {
                 (left_val, right_val) => {
                     if !(*left_val == *right_val) {
-                        println!("core incoherence: `{}` differs \
-                               ({}: `0x{:x}`, {}: `0x{:x}`)", stringify!($field), stringify!($left), left_val, stringify!($right), right_val);
+                        println!(
+                            "core incoherence: `{}` differs \
+                               ({}: `0x{:x}`, {}: `0x{:x}`)",
+                            stringify!($field),
+                            stringify!($left),
+                            left_val,
+                            stringify!($right),
+                            right_val
+                        );
                         return false;
                     }
                 }
             }
-        })
+        }};
     }
     fn assert_all_memory_accesses_equal(r68k: &TestCore) {
         if !equal(get_ops(), r68k.mem.logger.ops()) {
@@ -2607,17 +2747,20 @@ mod tests {
     }
     fn memory_accesses_equal_unless_exception(r68k: &TestCore) -> Option<u8> {
         let is_reading_vector = |&op| match op {
-            Operation::ReadLong(SUPERVISOR_DATA, addr, _) =>
-                addr % 4 == 0 && addr >= 0x08 && addr < 0x30,
-            _ =>
-                false
+            Operation::ReadLong(SUPERVISOR_DATA, addr, _) => {
+                addr % 4 == 0 && addr >= 0x08 && addr < 0x30
+            }
+            _ => false,
         };
         // Check that memory accesses match up.
         // If an exception occurred, do not compare beyond which vector
         // was taken as Mushashi during address errors, in some cases
         // also executed some instructions from the handler (now fixed)
         if let Some(vector_read_index) = r68k.mem.logger.ops().iter().position(is_reading_vector) {
-            if !equal(get_ops().iter().take(vector_read_index+1), r68k.mem.logger.ops().iter().take(vector_read_index+1)) {
+            if !equal(
+                get_ops().iter().take(vector_read_index + 1),
+                r68k.mem.logger.ops().iter().take(vector_read_index + 1),
+            ) {
                 println!("musashi ops: ");
                 for op in get_ops() {
                     println!("{:?}", op);
@@ -2626,7 +2769,10 @@ mod tests {
                 for op in r68k.mem.logger.ops() {
                     println!("{:?}", op);
                 }
-                assert_equal(get_ops().iter().take(vector_read_index+1), r68k.mem.logger.ops().iter().take(vector_read_index+1));
+                assert_equal(
+                    get_ops().iter().take(vector_read_index + 1),
+                    r68k.mem.logger.ops().iter().take(vector_read_index + 1),
+                );
             }
 
             // If we got this far, the memory accesses up to, and
@@ -2634,7 +2780,7 @@ mod tests {
             // compare further
             let vector = match r68k.mem.logger.ops()[vector_read_index] {
                 Operation::ReadLong(SUPERVISOR_DATA, addr, _) => addr / 4,
-                x => panic!("Unexpectedly got {:?}", x)
+                x => panic!("Unexpectedly got {:?}", x),
             };
             Some(vector as u8)
         } else {
@@ -2644,7 +2790,7 @@ mod tests {
     }
     fn cores_equal(musashi: &TestCore, r68k: &TestCore) -> bool {
         core_eq!(musashi, r68k.pc);
-        core_eq!(musashi, r68k.flags() ?);
+        core_eq!(musashi, r68k.flags()?);
         core_eq!(musashi, r68k.status_register());
         core_eq!(musashi, r68k.ssp());
         core_eq!(musashi, r68k.usp());
@@ -2666,10 +2812,7 @@ mod tests {
 
     #[test]
     fn roundtrip_abcd_rr() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         let pc = 0x40;
         // 0xc101: ABCD        D0, D1
@@ -2686,15 +2829,17 @@ mod tests {
 
         let ops = get_ops();
         assert_eq!(2, ops.len());
-        assert_eq!(Operation::ReadLong(SUPERVISOR_PROGRAM, pc, 0xc1010000), ops[0]);
+        assert_eq!(
+            Operation::ReadLong(SUPERVISOR_PROGRAM, pc, 0xc1010000),
+            ops[0]
+        );
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn compare_abcd_rr() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         let pc = 0x40;
         // 0xc300: ABCD        D1, D0
@@ -2708,15 +2853,13 @@ mod tests {
         assert_eq!(0x42, r68k.dar[1]);
 
         assert_cores_equal(&musashi, &r68k);
-    }
 
+        ::release_lock!(MUSASHI_LOCK);
+    }
 
     #[test]
     fn run_abcd_rr_twice() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         let pc = 0x40;
         // 0xc300: ABCD        D1, D0
@@ -2744,21 +2887,24 @@ mod tests {
         assert_eq!(0x73, r68k.dar[1]);
 
         assert_cores_equal(&musashi, &r68k);
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn compare_address_error_actions() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         // using an odd absolute address should force an address error
         // opcodes d278,0107 is ADD.W    $0107, D1
         let mut musashi = TestCore::new_mem(0x40, &[0xd2, 0x78, 0x01, 0x07]);
         let vec3handler = 0x1F0000;
-        musashi.mem.write_long(SUPERVISOR_PROGRAM, 3*4, vec3handler);
-        musashi.mem.write_word(SUPERVISOR_PROGRAM, vec3handler, OP_NOP);
+        musashi
+            .mem
+            .write_long(SUPERVISOR_PROGRAM, 3 * 4, vec3handler);
+        musashi
+            .mem
+            .write_word(SUPERVISOR_PROGRAM, vec3handler, OP_NOP);
         musashi.dar[15] = 0x100;
         let mut r68k = musashi.clone(); // so very self-aware!
         initialize_musashi(&mut musashi, 0xaaaaaaaa);
@@ -2767,19 +2913,22 @@ mod tests {
         r68k.execute1();
 
         assert_cores_equal(&musashi, &r68k);
+
+        ::release_lock!(MUSASHI_LOCK);
     }
     #[test]
     fn compare_illegal_instruction_actions() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         // d208 is ADD.B A0,D0, which is illegal
         let mut musashi = TestCore::new_mem(0x4000, &[0xd2, 08]);
         let vec4handler = 0x2F0000;
-        musashi.mem.write_long(SUPERVISOR_PROGRAM, 4*4, vec4handler);
-        musashi.mem.write_long(SUPERVISOR_PROGRAM, vec4handler, 0xd2780108);
+        musashi
+            .mem
+            .write_long(SUPERVISOR_PROGRAM, 4 * 4, vec4handler);
+        musashi
+            .mem
+            .write_long(SUPERVISOR_PROGRAM, vec4handler, 0xd2780108);
         musashi.dar[15] = 0x100;
         let mut r68k = musashi.clone(); // so very self-aware!
         initialize_musashi(&mut musashi, 0xaaaaaaaa);
@@ -2788,94 +2937,89 @@ mod tests {
         r68k.execute1();
 
         assert_cores_equal(&musashi, &r68k);
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
-use std::ptr;
-use super::m68k_get_reg;
+    use super::m68k_get_reg;
+    use std::ptr;
 
     #[test]
     fn stackpointers_are_correct_when_starting_in_supervisor_mode() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         let pc = 0x40;
         // 0xc300: ABCD        D1, D0
         // 0xc302: ABCD        D1, D2
         let mut musashi = TestCore::new_mem(pc, &[0xc3, 0x00, 0xc3, 0x02]);
-        musashi.sr_to_flags(1<<13);
+        musashi.sr_to_flags(1 << 13);
         musashi.inactive_usp = 0x200; // User SP
-        musashi.dar[15] = 0x100;       // Supa SP
+        musashi.dar[15] = 0x100; // Supa SP
         initialize_musashi(&mut musashi, 0xaaaaaaaa);
         unsafe {
-            assert!((1<<13) & m68k_get_reg(ptr::null_mut(), Register::SR) > 0);
+            assert!((1 << 13) & m68k_get_reg(ptr::null_mut(), Register::SR) > 0);
             assert_eq!(0x100, m68k_get_reg(ptr::null_mut(), Register::ISP));
             assert_eq!(0x200, m68k_get_reg(ptr::null_mut(), Register::USP));
         }
+
+        ::release_lock!(MUSASHI_LOCK);
     }
     #[test]
     fn stackpointers_are_correct_when_starting_in_user_mode() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         let pc = 0x40;
         // 0xc300: ABCD        D1, D0
         // 0xc302: ABCD        D1, D2
         let mut musashi = TestCore::new_mem(pc, &[0xc3, 0x00, 0xc3, 0x02]);
         musashi.sr_to_flags(0);
-        musashi.dar[15] = 0x200;       // User SP
+        musashi.dar[15] = 0x200; // User SP
         musashi.inactive_ssp = 0x100; // Supa SP
         initialize_musashi(&mut musashi, 0xaaaaaaaa);
         unsafe {
-            assert!((1<<13) & m68k_get_reg(ptr::null_mut(), Register::SR) == 0);
+            assert!((1 << 13) & m68k_get_reg(ptr::null_mut(), Register::SR) == 0);
             assert_eq!(0x100, m68k_get_reg(ptr::null_mut(), Register::ISP));
             assert_eq!(0x200, m68k_get_reg(ptr::null_mut(), Register::USP));
         }
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
-
-use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
+    use ram::{ADDRBUS_MASK, SUPERVISOR_DATA, USER_DATA, USER_PROGRAM};
 
     #[test]
     fn read_initialized_memory() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         for v in 0..256 {
-            assert_eq!(0x01, m68k_read_memory_8(4*v+0));
-            assert_eq!(0x02, m68k_read_memory_8(4*v+1));
-            assert_eq!(0x03, m68k_read_memory_8(4*v+2));
-            assert_eq!(0x04, m68k_read_memory_8(4*v+3));
+            assert_eq!(0x01, m68k_read_memory_8(4 * v + 0));
+            assert_eq!(0x02, m68k_read_memory_8(4 * v + 1));
+            assert_eq!(0x03, m68k_read_memory_8(4 * v + 2));
+            assert_eq!(0x04, m68k_read_memory_8(4 * v + 3));
         }
         for v in 0..256 {
-            assert_eq!(0x0102, m68k_read_memory_16(4*v+0));
-            assert_eq!(0x0203, m68k_read_memory_16(4*v+1));
-            assert_eq!(0x0304, m68k_read_memory_16(4*v+2));
-            if 4*v+3 < 1023 {
-                assert_eq!(0x0401, m68k_read_memory_16(4*v+3));
+            assert_eq!(0x0102, m68k_read_memory_16(4 * v + 0));
+            assert_eq!(0x0203, m68k_read_memory_16(4 * v + 1));
+            assert_eq!(0x0304, m68k_read_memory_16(4 * v + 2));
+            if 4 * v + 3 < 1023 {
+                assert_eq!(0x0401, m68k_read_memory_16(4 * v + 3));
             }
         }
         for v in 0..255 {
-            assert_eq!(0x01020304, m68k_read_memory_32(4*v+0));
-            assert_eq!(0x02030401, m68k_read_memory_32(4*v+1));
-            assert_eq!(0x03040102, m68k_read_memory_32(4*v+2));
-            assert_eq!(0x04010203, m68k_read_memory_32(4*v+3));
+            assert_eq!(0x01020304, m68k_read_memory_32(4 * v + 0));
+            assert_eq!(0x02030401, m68k_read_memory_32(4 * v + 1));
+            assert_eq!(0x03040102, m68k_read_memory_32(4 * v + 2));
+            assert_eq!(0x04010203, m68k_read_memory_32(4 * v + 3));
         }
-        assert_eq!(0x01020304, m68k_read_memory_32(4*255));
+        assert_eq!(0x01020304, m68k_read_memory_32(4 * 255));
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn read_your_u32_writes() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         let pattern = 0xAAAA7777;
@@ -2883,14 +3027,13 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         assert!(pattern != m68k_read_memory_32(address));
         m68k_write_memory_32(address, pattern);
         assert_eq!(pattern, m68k_read_memory_32(address));
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn read_your_u16_writes() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         let pattern = 0xAAAA7777;
@@ -2898,14 +3041,13 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         assert!(pattern != m68k_read_memory_16(address));
         m68k_write_memory_16(address, pattern);
         assert_eq!(pattern & 0xFFFF, m68k_read_memory_16(address));
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn read_your_u8_writes() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         let pattern = 0xAAAA7777;
@@ -2913,14 +3055,13 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         assert!(pattern != m68k_read_memory_8(address));
         m68k_write_memory_8(address, pattern);
         assert_eq!(pattern & 0xFF, m68k_read_memory_8(address));
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn shared_address_space() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         let pattern = 0xAAAA7777;
@@ -2943,14 +3084,13 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         assert_eq!(pattern, m68k_read_memory_32(address));
         m68k_set_fc(SUPERVISOR_PROGRAM.fc());
         assert_eq!(pattern, m68k_read_memory_32(address));
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn do_read_byte_is_logged() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -2958,15 +3098,17 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         m68k_read_memory_8(address);
         let ops = get_ops();
         assert!(ops.len() > 0);
-        assert_eq!(Operation::ReadByte(SUPERVISOR_DATA, address & ADDRBUS_MASK, 0x01), ops[0]);
+        assert_eq!(
+            Operation::ReadByte(SUPERVISOR_DATA, address & ADDRBUS_MASK, 0x01),
+            ops[0]
+        );
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn do_read_word_is_logged() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -2974,15 +3116,17 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         m68k_read_memory_16(address);
         let ops = get_ops();
         assert!(ops.len() > 0);
-        assert_eq!(Operation::ReadWord(SUPERVISOR_PROGRAM, address & ADDRBUS_MASK, 0x0102), ops[0]);
+        assert_eq!(
+            Operation::ReadWord(SUPERVISOR_PROGRAM, address & ADDRBUS_MASK, 0x0102),
+            ops[0]
+        );
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn do_read_long_is_logged() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -2990,15 +3134,17 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         m68k_read_memory_32(address);
         let ops = get_ops();
         assert!(ops.len() > 0);
-        assert_eq!(Operation::ReadLong(USER_DATA, address & ADDRBUS_MASK, 0x01020304), ops[0]);
+        assert_eq!(
+            Operation::ReadLong(USER_DATA, address & ADDRBUS_MASK, 0x01020304),
+            ops[0]
+        );
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn do_write_byte_is_logged() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -3007,15 +3153,17 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         m68k_write_memory_8(address, pattern);
         let ops = get_ops();
         assert!(ops.len() > 0);
-        assert_eq!(Operation::WriteByte(USER_PROGRAM, address & ADDRBUS_MASK, pattern), ops[0]);
+        assert_eq!(
+            Operation::WriteByte(USER_PROGRAM, address & ADDRBUS_MASK, pattern),
+            ops[0]
+        );
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn do_write_word_is_logged() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -3024,15 +3172,17 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         m68k_write_memory_16(address, pattern);
         let ops = get_ops();
         assert!(ops.len() > 0);
-        assert_eq!(Operation::WriteWord(SUPERVISOR_PROGRAM, address & ADDRBUS_MASK, pattern), ops[0]);
+        assert_eq!(
+            Operation::WriteWord(SUPERVISOR_PROGRAM, address & ADDRBUS_MASK, pattern),
+            ops[0]
+        );
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn do_write_long_is_logged() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         let address = 0x80;
@@ -3041,21 +3191,22 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         m68k_write_memory_32(address, pattern);
         let ops = get_ops();
         assert!(ops.len() > 0);
-        assert_eq!(Operation::WriteLong(USER_DATA, address & ADDRBUS_MASK, pattern), ops[0]);
+        assert_eq!(
+            Operation::WriteLong(USER_DATA, address & ADDRBUS_MASK, pattern),
+            ops[0]
+        );
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
-    fn page_allocation_on_write_unless_matching_initializer()
-    {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+    fn page_allocation_on_write_unless_matching_initializer() {
+        ::set_lock!(MUSASHI_LOCK);
 
         let data = 0x01020304;
         initialize_musashi_memory(data);
         for offset in 0..256 {
-            m68k_write_memory_32(4*offset, data);
+            m68k_write_memory_32(4 * offset, data);
         }
         m68k_write_memory_8(0, 0x1);
         m68k_write_memory_8(1, 0x2);
@@ -3075,45 +3226,44 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
         assert_eq!(1, musashi_written_bytes());
         let ops = get_ops();
         assert_eq!(263, ops.len());
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn cross_boundary_byte_access() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
         m68k_write_memory_8(ADDRBUS_MASK, 0x91);
         assert_eq!(0x91, m68k_read_memory_8(ADDRBUS_MASK));
-        m68k_write_memory_8(ADDRBUS_MASK+1, 0x92);
+        m68k_write_memory_8(ADDRBUS_MASK + 1, 0x92);
         assert_eq!(0x92, m68k_read_memory_8(0));
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 
     #[test]
     fn cross_boundary_word_access() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
-        m68k_write_memory_16(ADDRBUS_MASK+1, 0x9192);
+        m68k_write_memory_16(ADDRBUS_MASK + 1, 0x9192);
         assert_eq!(0x9192, m68k_read_memory_16(0));
-   }
+
+        ::release_lock!(MUSASHI_LOCK);
+    }
 
     #[test]
     fn cross_boundary_long_access() {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         initialize_musashi_memory(0x01020304);
-        m68k_write_memory_32(ADDRBUS_MASK-1, 0x91929394);
-        assert_eq!(0x91929394, m68k_read_memory_32(ADDRBUS_MASK-1));
-   }
+        m68k_write_memory_32(ADDRBUS_MASK - 1, 0x91929394);
+        assert_eq!(0x91929394, m68k_read_memory_32(ADDRBUS_MASK - 1));
+
+        ::release_lock!(MUSASHI_LOCK);
+    }
 
     use super::m68k_set_irq;
 
@@ -3133,21 +3283,27 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
     }
 
     fn test_interrupts(mask: u16, irq: u32) {
-        let _guard = match MUSASHI_LOCK.lock() {
-            Ok(guard) => guard,
-            Err(poisoned) => poisoned.into_inner(),
-        };
+        ::set_lock!(MUSASHI_LOCK);
 
         // opcodes d278,0108 is ADD.W    $0108, D1
-        let mut musashi = TestCore::new_mem(0x4000, &[0xd2, 0x78, 0x01, 0x08, 0xd2, 0x78, 0x01, 0x08, 0xd2, 0x78, 0x01, 0x08]);
+        let mut musashi = TestCore::new_mem(
+            0x4000,
+            &[
+                0xd2, 0x78, 0x01, 0x08, 0xd2, 0x78, 0x01, 0x08, 0xd2, 0x78, 0x01, 0x08,
+            ],
+        );
         let supervisor_bit = 1 << 13;
         let irq_mask = mask << 8;
         musashi.sr_to_flags(supervisor_bit | irq_mask);
         let vec4handler = 0x2F0000;
         let autovector_base = 24;
-        musashi.mem.write_long(SUPERVISOR_PROGRAM, (autovector_base + irq) * 4 , vec4handler);
+        musashi
+            .mem
+            .write_long(SUPERVISOR_PROGRAM, (autovector_base + irq) * 4, vec4handler);
         // opcodes d278,0108 is ADD.W    $0108, D1
-        musashi.mem.write_long(SUPERVISOR_PROGRAM, vec4handler, 0xd2780108);
+        musashi
+            .mem
+            .write_long(SUPERVISOR_PROGRAM, vec4handler, 0xd2780108);
         musashi.dar[15] = 0x100;
         let mut r68k = musashi.clone(); // so very self-aware!
         initialize_musashi(&mut musashi, 0xaaaaaaaa);
@@ -3168,5 +3324,7 @@ use ram::{SUPERVISOR_DATA, USER_PROGRAM, USER_DATA, ADDRBUS_MASK};
             assert!(r68k_cycles < Cycles(40));
         }
         assert_cores_equal(&musashi, &r68k);
+
+        ::release_lock!(MUSASHI_LOCK);
     }
 }

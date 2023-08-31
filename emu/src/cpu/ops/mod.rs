@@ -2173,7 +2173,8 @@ macro_rules! movem_32_re {
             for i in 0..16 {
                 if registers & (1 << i) > 0 {
                     let reg = dar!(core)[i];
-                    core.write_long(ea, reg)?;
+                    core.write_word(ea + 2, reg & 0xffff)?;
+                    core.write_word(ea, reg >> 16)?;
                     ea = ea.wrapping_add(4);
                     moves += 1;
                 }

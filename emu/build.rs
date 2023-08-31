@@ -45,6 +45,7 @@ fn main() {
                     .join(Path::new("softfloat"))
                     .join(Path::new("softfloat.c")),
             )
+            .opt_level(2)
             .compile("musashi");
         let _ = fs::remove_file(musashi_dir.join(Path::new("m68kmake.exe")));
         let _ = fs::remove_file(musashi_dir.join(Path::new("m68kmake.obj")));
@@ -73,6 +74,7 @@ fn main() {
                     .join(Path::new("softfloat"))
                     .join(Path::new("softfloat.c")),
             )
+            .opt_level(2)
             .compile("musashi");
         let _ = fs::remove_file(musashi_dir.join(Path::new("m68kmake")));
         let _ = fs::remove_file(musashi_dir.join(Path::new("m68kmake.o")));
