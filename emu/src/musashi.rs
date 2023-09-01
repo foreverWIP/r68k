@@ -357,8 +357,7 @@ pub fn initialize_musashi(core: &mut TestCore, memory_initializer: u32) {
         /*for (addr, byte) in core.mem.diffs() {
             write_musashi_byte(addr, byte);
         }*/
-        let core_mem = core.mem.mem();
-        MUSASHI_MEMORY.copy_from_slice(core_mem);
+        MUSASHI_MEMORY.copy_from_slice(&crate::ram::loggingmem::TESTCORE_MEMORY);
     }
 }
 

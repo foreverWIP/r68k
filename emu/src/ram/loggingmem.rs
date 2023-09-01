@@ -72,7 +72,6 @@ impl OpsLogging for OpsLogger {
 
 pub struct LoggingMem<T: OpsLogging> {
     pub logger: T,
-    mem: Box<[u8]>,
     pub initializer: u32,
 }
 
@@ -84,32 +83,30 @@ pub fn fast_copy(arr: &mut[u8; MEM_SIZE], value: u32) {
     }
 }
 
+pub static mut TESTCORE_MEMORY: [u8; 0x1_00_0000] = [0xaau8; 0x1_00_0000];
+
 impl<T: OpsLogging> LoggingMem<T> {
     pub fn new(initializer: u32, logger: T) -> LoggingMem<T> {
-        let mut mem = crate::box_array![0u8; 0x1_00_0000];
-        fast_copy(&mut *mem, initializer);
-        LoggingMem {
-            logger,
-            mem, // PagedMem::new(initializer),
-            initializer,
+        unsafe {
+            fast_copy(&mut TESTCORE_MEMORY, initializer);
+            LoggingMem {
+                logger,
+                initializer,
+            }
         }
     }
     pub fn read_u8(&self, address: u32) -> u32 {
-        self.mem[(address & ADDRBUS_MASK) as usize] as u32
+        unsafe {TESTCORE_MEMORY[(address & ADDRBUS_MASK) as usize] as u32}
     }
 
     pub fn write_u8(&mut self, address: u32, value: u32) {
-        self.mem[(address & ADDRBUS_MASK) as usize] = value as u8;
-    }
-
-    pub fn mem(&self) -> &[u8] {
-        &*self.mem
+        unsafe {TESTCORE_MEMORY[(address & ADDRBUS_MASK) as usize] = value as u8;}
     }
 }
 
 impl<T: OpsLogging> AddressBus for LoggingMem<T> {
     fn copy_from(&mut self, other: &Self) {
-        self.mem.copy_from_slice(&*other.mem);
+        // self.mem.copy_from_slice(&*other.mem);
     }
 
     fn read_byte(&self, address_space: AddressSpace, address: u32) -> u32 {
