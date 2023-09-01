@@ -76,10 +76,11 @@ use ram::loggingmem::Operation;
 use ram::{
     AddressSpace, ADDRBUS_MASK, SUPERVISOR_DATA, SUPERVISOR_PROGRAM, USER_DATA, USER_PROGRAM,
 };
-static mut MUSASHI_LOCATIONS_USED: usize = 0;
+// static mut MUSASHI_LOCATIONS_USED: usize = 0;
 static mut MUSASHI_MEMORY_INITIALIZER: u32 = 0xaaaaaaaa;
-static mut MUSASHI_MEMORY_LOCATION: [u32; 1024] = [0; 1024];
-static mut MUSASHI_MEMORY_DATA: [u8; 1024] = [0; 1024];
+// static mut MUSASHI_MEMORY_LOCATION: [u32; 1024] = [0; 1024];
+// static mut MUSASHI_MEMORY_DATA: [u8; 1024] = [0; 1024];
+static mut MUSASHI_MEMORY: [u8; 0x1_00_0000] = [0xaau8; 0x1_00_0000];
 
 // as statics are not allowed to have destructors, allocate a
 // big enough array to hold the small number of operations
@@ -207,25 +208,26 @@ unsafe fn read_initializer(address: u32) -> u8 {
     };
     ((MUSASHI_MEMORY_INITIALIZER >> shift) & 0xFF) as u8
 }
-unsafe fn find_musashi_location(address: u32) -> Option<usize> {
+/*unsafe fn find_musashi_location(address: u32) -> Option<usize> {
     for i in 0..MUSASHI_LOCATIONS_USED {
         if MUSASHI_MEMORY_LOCATION[i as usize] == address {
             return Some(i as usize);
         }
     }
     None
-}
+}*/
 unsafe fn read_musashi_byte(address: u32) -> u8 {
     let address = address & ADDRBUS_MASK;
-    if let Some(index) = find_musashi_location(address) {
+    /*if let Some(index) = find_musashi_location(address) {
         MUSASHI_MEMORY_DATA[index]
     } else {
         read_initializer(address)
-    }
+    }*/
+    MUSASHI_MEMORY[address as usize]
 }
 unsafe fn write_musashi_byte(address: u32, data: u8) {
     let address = address & ADDRBUS_MASK;
-    let write_differs_from_initializer = data != read_initializer(address);
+    /*let write_differs_from_initializer = data != read_initializer(address);
     if write_differs_from_initializer {
         if let Some(index) = find_musashi_location(address) {
             MUSASHI_MEMORY_DATA[index] = data;
@@ -234,7 +236,8 @@ unsafe fn write_musashi_byte(address: u32, data: u8) {
             MUSASHI_MEMORY_DATA[MUSASHI_LOCATIONS_USED] = data;
             MUSASHI_LOCATIONS_USED += 1;
         }
-    }
+    }*/
+    MUSASHI_MEMORY[address as usize] = data;
 }
 
 #[no_mangle]
@@ -327,6 +330,7 @@ fn get_ops() -> Vec<Operation> {
 pub fn initialize_musashi(core: &mut TestCore, memory_initializer: u32) {
     // println!("initialize_musashi {:?}", thread::current());
     unsafe {
+        m68ki_address_space = 5;
         initialize_musashi_memory(memory_initializer);
         m68k_init();
         m68k_set_cpu_type(CpuType::M68000);
@@ -350,23 +354,26 @@ pub fn initialize_musashi(core: &mut TestCore, memory_initializer: u32) {
             }
         }
         // just copy diffs, as it takes too long to reset all 16MB
-        for (addr, byte) in core.mem.diffs() {
+        /*for (addr, byte) in core.mem.diffs() {
             write_musashi_byte(addr, byte);
-        }
+        }*/
+        let core_mem = core.mem.mem();
+        MUSASHI_MEMORY.copy_from_slice(core_mem);
     }
 }
 
 pub fn initialize_musashi_memory(initializer: u32) {
-    unsafe {
+    /*unsafe {
         MUSASHI_MEMORY_INITIALIZER = initializer;
         MUSASHI_OPCOUNT = 0;
         MUSASHI_LOCATIONS_USED = 0;
         m68k_set_fc(SUPERVISOR_PROGRAM.fc());
-    }
+    }*/
+    unsafe {crate::ram::loggingmem::fast_copy(&mut MUSASHI_MEMORY, initializer);}
 }
-pub fn musashi_written_bytes() -> u16 {
+/*pub fn musashi_written_bytes() -> u16 {
     unsafe { MUSASHI_LOCATIONS_USED as u16 }
-}
+}*/
 const EXEC_CYCLES: i32 = 1; // configurable for testing purposes
 pub fn execute1(core: &mut TestCore) -> Cycles {
     execute(core, 1)
@@ -542,7 +549,7 @@ mod tests {
 
     fn opcodes(mask: u32, matching: u32) -> Vec<u16> {
         (matching..0x10000u32)
-            .filter(|opcode| (opcode & mask) == matching)
+            .filter(|opcode| (opcode & mask) == matching && crate::cpu::ops::INSTRUCTION_SET_TEST[*opcode as usize] != crate::cpu::ops::illegal)
             .map(|v| v as u16)
             .collect::<Vec<u16>>()
     }
@@ -719,9 +726,11 @@ mod tests {
                 let qc_rounds = 1 << ($opmask as u16).count_zeros();
                 for opcode in opcodes($opmask, $opcode)
                 {
+                    /*
                     if crate::cpu::ops::INSTRUCTION_SET_TEST[opcode as usize] == crate::cpu::ops::illegal {
                         continue;
                     }
+                    */
                     // println!("Will hammer {:016b} {} times", opcode, qc_rounds);
                     unsafe {
                         // this is because I don't know how to make
@@ -3202,7 +3211,7 @@ mod tests {
         ::release_lock!(MUSASHI_LOCK);
     }
 
-    #[test]
+    /*#[test]
     fn page_allocation_on_write_unless_matching_initializer() {
         ::set_lock!(MUSASHI_LOCK);
 
@@ -3231,7 +3240,7 @@ mod tests {
         assert_eq!(263, ops.len());
 
         ::release_lock!(MUSASHI_LOCK);
-    }
+    }*/
 
     #[test]
     fn cross_boundary_byte_access() {

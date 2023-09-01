@@ -72,35 +72,44 @@ impl OpsLogging for OpsLogger {
 
 pub struct LoggingMem<T: OpsLogging> {
     pub logger: T,
-    mem: PagedMem,
+    mem: Box<[u8]>,
     pub initializer: u32,
+}
+
+const MEM_SIZE: usize = 0x1_00_0000;
+pub fn fast_copy(arr: &mut[u8; MEM_SIZE], value: u32) {
+    let arr32 = unsafe { std::mem::transmute::<&mut[u8; MEM_SIZE], &mut[u32; MEM_SIZE/4]>(arr) };
+    for elem in arr32 {
+        *elem = value.to_be();
+    }
 }
 
 impl<T: OpsLogging> LoggingMem<T> {
     pub fn new(initializer: u32, logger: T) -> LoggingMem<T> {
+        let mut mem = crate::box_array![0u8; 0x1_00_0000];
+        fast_copy(&mut *mem, initializer);
         LoggingMem {
             logger,
-            mem: PagedMem::new(initializer),
+            mem, // PagedMem::new(initializer),
             initializer,
         }
     }
     pub fn read_u8(&self, address: u32) -> u32 {
-        self.mem.read_u8(address)
+        self.mem[(address & ADDRBUS_MASK) as usize] as u32
     }
 
     pub fn write_u8(&mut self, address: u32, value: u32) {
-        self.mem.write_u8(address, value)
+        self.mem[(address & ADDRBUS_MASK) as usize] = value as u8;
     }
-    pub fn diffs(&self) -> DiffIter {
-        self.mem.diffs()
+
+    pub fn mem(&self) -> &[u8] {
+        &*self.mem
     }
 }
 
 impl<T: OpsLogging> AddressBus for LoggingMem<T> {
     fn copy_from(&mut self, other: &Self) {
-        for (addr, byte) in other.diffs() {
-            self.write_u8(addr, u32::from(byte));
-        }
+        self.mem.copy_from_slice(&*other.mem);
     }
 
     fn read_byte(&self, address_space: AddressSpace, address: u32) -> u32 {

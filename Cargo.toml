@@ -4,4 +4,3 @@ members = ["emu", "tools", "common"]
 [profile.test]
 opt-level = 2
 overflow-checks = false
-
