@@ -541,10 +541,15 @@ mod tests {
     // }
 
     fn opcodes(mask: u32, matching: u32) -> Vec<u16> {
-        (matching..0x10000u32)
-            .filter(|opcode| (opcode & mask) == matching)
-            .map(|v| v as u16)
-            .collect::<Vec<u16>>()
+        let mask = mask as u16;
+        let matching = matching as u16;
+        let ops = (*crate::cpu::ops::OPCODES_ALL_LEGAL).clone();
+        let ret: Vec<u16> = ops
+            .iter()
+            .filter(|&opcode| (opcode & mask) == matching)
+            .map(|u| *u)
+            .collect::<Vec<_>>();
+        ret
     }
     macro_rules! opcodes {
         ($mask:expr , $matching:expr) => {
@@ -571,7 +576,8 @@ mod tests {
     }
 
     static mut OPCODE_UNDER_TEST: u16 = 0;
-    static mut OPCODE_UNDER_TEST_ACCESSES: usize = 0;
+    extern crate once_cell;
+    static mut MUSASHI_CORE: Option<TestCore> = None;
 
     fn hammer_cores_even_addresses(memory_pattern: Bitpattern, rs: Vec<(Register, Bitpattern)>) -> TestResult {
         let mem_mask = (2<<24)-2; // keep even
@@ -595,93 +601,109 @@ mod tests {
             ]
         };
         let Bitpattern(memory_initializer) = memory_pattern;
-        let mut musashi = TestCore::new_mem_init_for_tests(pc, &mem, memory_initializer & mem_mask);
-        const STACK_MASK: u32 = 1024 - 16; // keep even
-        musashi.inactive_ssp = 0x128;
-        musashi.inactive_usp = 0x256;
-        for r in 0..8 {
-            musashi.dar[r] = 0;
-            musashi.dar[8 + r] = 0x128;
-        }
-        // set up RESET vector in memory
-        let (ssp, pc) = (musashi.ssp(), musashi.pc);
-        musashi.write_program_long(0, ssp).unwrap();
-        musashi.write_program_long(4, pc).unwrap();
-        let generic_handler = 0xf00000;
-        for v in 2..48 {
-            musashi.write_data_long(v * 4, generic_handler).unwrap();
-        }
-        // ensure the handler is a series of NOPs that will exhaust any
-        // remaining supply of cycles. In case of Address Error, Musashi
-        // in some cases got extra cycles via a negative deduction issue
-        // and continued execution for several more cycles (now fixed)
-        for i in 0..4 {
-            musashi
-                .write_program_word(generic_handler + 2 * i, OP_NOP)
-                .unwrap();
-        }
-
-        for r in rs {
-            match r {
-                (Register::D0, Bitpattern(bp)) => musashi.dar[0] = bp,
-                (Register::D1, Bitpattern(bp)) => musashi.dar[1] = bp,
-                (Register::D2, Bitpattern(bp)) => musashi.dar[2] = bp,
-                (Register::D3, Bitpattern(bp)) => musashi.dar[3] = bp,
-                (Register::D4, Bitpattern(bp)) => musashi.dar[4] = bp,
-                (Register::D5, Bitpattern(bp)) => musashi.dar[5] = bp,
-                (Register::D6, Bitpattern(bp)) => musashi.dar[6] = bp,
-                (Register::D7, Bitpattern(bp)) => musashi.dar[7] = bp,
-                // must ensure Addresses are within musashi memory space!
-                (Register::A0, Bitpattern(bp)) => musashi.dar[0 + 8] = bp & mem_mask,
-                (Register::A1, Bitpattern(bp)) => musashi.dar[1 + 8] = bp & mem_mask,
-                (Register::A2, Bitpattern(bp)) => musashi.dar[2 + 8] = bp & mem_mask,
-                (Register::A3, Bitpattern(bp)) => musashi.dar[3 + 8] = bp & mem_mask,
-                (Register::A4, Bitpattern(bp)) => musashi.dar[4 + 8] = bp & mem_mask,
-                (Register::A5, Bitpattern(bp)) => musashi.dar[5 + 8] = bp & mem_mask,
-                (Register::A6, Bitpattern(bp)) => musashi.dar[6 + 8] = bp & mem_mask,
-                (Register::A7, Bitpattern(bp)) => musashi.dar[7 + 8] = bp & STACK_MASK + 8,
-                (Register::USP, Bitpattern(bp)) => musashi.inactive_usp = bp & STACK_MASK + 8,
-                (Register::SR, Bitpattern(bp)) => musashi.sr_to_flags(bp as u16),
-                _ => {
-                    panic!("No idea how to set {:?}", r.0)
+        unsafe {
+            fn setup_musashi_core(musashi: &mut TestCore, mem_mask: u32, rs: Vec<(Register, Bitpattern)>) {
+                const STACK_MASK: u32 = 1024 - 16; // keep even
+                musashi.inactive_ssp = 0x128;
+                musashi.inactive_usp = 0x256;
+                for r in 0..8 {
+                    musashi.dar[r] = 0;
+                    musashi.dar[8 + r] = 0x128;
                 }
+
+                // set up RESET vector in memory
+                let (ssp, pc) = (musashi.ssp(), musashi.pc);
+                musashi.write_program_long(0, ssp).unwrap();
+                musashi.write_program_long(4, pc).unwrap();
+                let generic_handler = 0xf00000;
+                for v in 2..48 {
+                    musashi.write_data_long(v * 4, generic_handler).unwrap();
+                }
+                // ensure the handler is a series of NOPs that will exhaust any
+                // remaining supply of cycles. In case of Address Error, Musashi
+                // in some cases got extra cycles via a negative deduction issue
+                // and continued execution for several more cycles (now fixed)
+                for i in 0..4 {
+                    musashi
+                        .write_program_word(generic_handler + 2 * i, OP_NOP)
+                        .unwrap();
+                }
+
+                for r in rs {
+                    match r {
+                        (Register::D0, Bitpattern(bp)) => musashi.dar[0] = bp,
+                        (Register::D1, Bitpattern(bp)) => musashi.dar[1] = bp,
+                        (Register::D2, Bitpattern(bp)) => musashi.dar[2] = bp,
+                        (Register::D3, Bitpattern(bp)) => musashi.dar[3] = bp,
+                        (Register::D4, Bitpattern(bp)) => musashi.dar[4] = bp,
+                        (Register::D5, Bitpattern(bp)) => musashi.dar[5] = bp,
+                        (Register::D6, Bitpattern(bp)) => musashi.dar[6] = bp,
+                        (Register::D7, Bitpattern(bp)) => musashi.dar[7] = bp,
+                        // must ensure Addresses are within musashi memory space!
+                        (Register::A0, Bitpattern(bp)) => musashi.dar[0 + 8] = bp & mem_mask,
+                        (Register::A1, Bitpattern(bp)) => musashi.dar[1 + 8] = bp & mem_mask,
+                        (Register::A2, Bitpattern(bp)) => musashi.dar[2 + 8] = bp & mem_mask,
+                        (Register::A3, Bitpattern(bp)) => musashi.dar[3 + 8] = bp & mem_mask,
+                        (Register::A4, Bitpattern(bp)) => musashi.dar[4 + 8] = bp & mem_mask,
+                        (Register::A5, Bitpattern(bp)) => musashi.dar[5 + 8] = bp & mem_mask,
+                        (Register::A6, Bitpattern(bp)) => musashi.dar[6 + 8] = bp & mem_mask,
+                        (Register::A7, Bitpattern(bp)) => musashi.dar[7 + 8] = bp & STACK_MASK + 8,
+                        (Register::USP, Bitpattern(bp)) => musashi.inactive_usp = bp & STACK_MASK + 8,
+                        (Register::SR, Bitpattern(bp)) => musashi.sr_to_flags(bp as u16),
+                        _ => {
+                            panic!("No idea how to set {:?}", r.0)
+                        }
+                    }
+                }
+                musashi.s_flag = 4;
+            }
+
+            fn test_cores(musashi: &mut TestCore, mem_mask: u32, memory_initializer: u32, allow_exception: bool) -> TestResult {
+                let mut r68k = musashi.clone(); // so very self-aware!
+
+                let musashi_cycles = reset_and_execute1(musashi, memory_initializer & mem_mask);
+                let r68k_cycles = r68k.execute(super::EXEC_CYCLES);
+                // panics if differences are found. Returns false if an
+                // exception occurred, and then we cannot compare state further
+                // unless PC is the same (as then the cores have progressed to
+                // the same spot) and we allow exceptions (or we would discard
+                // all results for those instructions that always result  in
+                // exceptions such as illegal/unimplemented or traps)
+                let can_compare_cycles = if let Some(vector) = memory_accesses_equal_unless_exception(&r68k)
+                {
+                    if musashi.pc != r68k.pc || !allow_exception {
+                        return TestResult::discard();
+                    } else {
+                        // cannot compare cycles due to differences with
+                        // Musashis handling of CHK and DIV exceptions
+                        vector != EXCEPTION_ZERO_DIVIDE && vector != EXCEPTION_CHK
+                    }
+                } else {
+                    true
+                };
+                let ret = if cores_equal(&musashi, &r68k) {
+                    if can_compare_cycles && musashi_cycles != r68k_cycles {
+                        println!("Musashi {:?} but r68k {:?}", musashi_cycles, r68k_cycles);
+                    }
+                    TestResult::from_bool(!can_compare_cycles || musashi_cycles == r68k_cycles)
+                } else {
+                    TestResult::failed()
+                };
+                ret
+            }
+
+            if let Some(ref mut core) = &mut MUSASHI_CORE {
+                core.reset_mem(pc, &mem, memory_initializer & mem_mask);
+                setup_musashi_core(core, mem_mask, rs);
+                test_cores(core, mem_mask, memory_initializer, allow_exception)
+            } else {
+                let mut core = TestCore::new_mem_init_for_tests(pc, &mem, memory_initializer & mem_mask);
+                setup_musashi_core(&mut core, mem_mask, rs);
+                let ret = test_cores(&mut core, mem_mask, memory_initializer, allow_exception);
+                MUSASHI_CORE = Some(core.clone());
+                ret
             }
         }
-        musashi.s_flag = 4;
-        let mut r68k = musashi.clone(); // so very self-aware!
-
-        ::set_lock!(MUSASHI_LOCK);
-
-        let musashi_cycles = reset_and_execute1(&mut musashi, memory_initializer & mem_mask);
-        let r68k_cycles = r68k.execute(super::EXEC_CYCLES);
-        // panics if differences are found. Returns false if an
-        // exception occurred, and then we cannot compare state further
-        // unless PC is the same (as then the cores have progressed to
-        // the same spot) and we allow exceptions (or we would discard
-        // all results for those instructions that always result  in
-        // exceptions such as illegal/unimplemented or traps)
-        let can_compare_cycles = if let Some(vector) = memory_accesses_equal_unless_exception(&r68k)
-        {
-            if musashi.pc != r68k.pc || !allow_exception {
-                return TestResult::discard();
-            } else {
-                // cannot compare cycles due to differences with
-                // Musashis handling of CHK and DIV exceptions
-                vector != EXCEPTION_ZERO_DIVIDE && vector != EXCEPTION_CHK
-            }
-        } else {
-            true
-        };
-        let ret = if cores_equal(&musashi, &r68k) {
-            if can_compare_cycles && musashi_cycles != r68k_cycles {
-                println!("Musashi {:?} but r68k {:?}", musashi_cycles, r68k_cycles);
-            }
-            TestResult::from_bool(!can_compare_cycles || musashi_cycles == r68k_cycles)
-        } else {
-            TestResult::failed()
-        };
-        ::release_lock!(MUSASHI_LOCK);
-        ret
     }
 
     macro_rules! qc8 {
@@ -707,31 +729,27 @@ mod tests {
                 ::set_lock!(QUICKCHECK_LOCK);
                 // check for mask/opcode inconsistency
                 assert!($opmask & $opcode == $opcode);
-                // the naive way of calculating the amount of bit permutations would
-                // look something like the following:
-                // let qc_rounds = cmp::max(1, u32::pow(2, ($opmask as u16).count_zeros()));
-                // note that for the pow-based computation above ^^^ because a max function
-                // is used with the other argument being 1, that no zero bits leads to a
-                // result of 1. 1 zero bit leads to a result of 2 (since both values of
-                // the bit need to be tested), 2 zero bits leads to a result of 4,
-                // 3 bits leads to 8, and so on. this means that the whole computation can
-                // be reduced to a single shift
-                let qc_rounds = 1 << ($opmask as u16).count_zeros();
+
+                const QC_ROUNDS: usize = 256;
+
+                // for opcode in $opcode..($opcode + BLOCK_SIZE)
                 for opcode in opcodes($opmask, $opcode)
                 {
-                    // println!("Will hammer {:016b} {} times", opcode, qc_rounds);
+                    println!("Hammering {:016b} {} times", opcode, QC_ROUNDS);
                     unsafe {
                         // this is because I don't know how to make
                         // hammer_cores take the opcode as a parameter and
                         // we cannot simply use a closure either; see
                         // https://github.com/BurntSushi/quickcheck/issues/56
-                        OPCODE_UNDER_TEST = opcode;
+                        OPCODE_UNDER_TEST = opcode as u16;
                     }
                     QuickCheck::new()
-                        .gen(Gen::new(256))
-                        .tests(qc_rounds as u64)
+                        .gen(Gen::new(QC_ROUNDS))
+                        .tests(QC_ROUNDS as u64)
+                        .min_tests_passed(QC_ROUNDS as u64)
                         .quickcheck($hammer as fn(_, _) -> _);
                 }
+
                 ::release_lock!(QUICKCHECK_LOCK);
             }
         };

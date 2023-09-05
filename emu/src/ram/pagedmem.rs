@@ -9,6 +9,7 @@ type Page = Vec<u8>;
 
 pub struct PagedMem {
     pages: HashMap<u32, Page>,
+    page_template: Page,
     pub initializer: u32,
 }
 
@@ -19,7 +20,7 @@ impl PagedMem {
     }
     fn new_page_is_needed(&self, address: u32, value_to_write: u8) -> bool {
         let pageno = address & PAGE_MASK;
-        let write_differs_from_initializer = value_to_write as u8 != self.read_initializer(address);
+        let write_differs_from_initializer = value_to_write as u8 != Self::read_initializer(address, self.initializer);
         !self.pages.contains_key(&pageno) && write_differs_from_initializer
     }
     // returns a page if it is already allocated, but inserts a missing page
@@ -33,22 +34,17 @@ impl PagedMem {
         self.pages.get_mut(&pageno)
     }
     fn create_initialized_page(&mut self, pageno: u32) {
-        let mut page = Vec::with_capacity(PAGE_SIZE as usize);
-        // initialize page
-        for offset in 0..PAGE_SIZE {
-            page.push(self.read_initializer(offset));
-        }
-        self.pages.insert(pageno, page);
+        self.pages.insert(pageno, self.page_template.clone());
     }
     // read uninitialized bytes from initializer instead
-    fn read_initializer(&self, address: u32) -> u8 {
+    fn read_initializer(address: u32, initializer: u32) -> u8 {
         let shift = match address % 4 {
             0 => 24,
             1 => 16,
             2 =>  8,
             _ =>  0,
         };
-        ((self.initializer >> shift) & 0xFF) as u8
+        ((initializer >> shift) & 0xFF) as u8
     }
     pub fn read_u8(&self, address: u32) -> u32 {
         let pageno = address & PAGE_MASK;
@@ -56,7 +52,7 @@ impl PagedMem {
             let index = (address & ADDR_MASK) as usize;
             u32::from(page[index])
         } else {
-            u32::from(self.read_initializer(address))
+            u32::from(Self::read_initializer(address, self.initializer))
         }
     }
 
@@ -71,11 +67,23 @@ impl PagedMem {
         keys.sort();
         DiffIter { pages: &self.pages, keys, offset: 0 }
     }
-}
 
-impl PagedMem {
     pub fn new(initializer: u32) -> PagedMem {
-        PagedMem { pages: HashMap::new(), initializer }
+        let mut page_template = Vec::with_capacity(PAGE_SIZE as usize);
+        // initialize page
+        for offset in 0..PAGE_SIZE {
+            page_template.push(Self::read_initializer(offset, initializer));
+        }
+        PagedMem { pages: HashMap::new(), initializer, page_template }
+    }
+
+    pub fn reset(&mut self, initializer: u32) {
+        self.initializer = initializer;
+        self.pages.clear();
+        self.page_template.clear();
+        for offset in 0..PAGE_SIZE {
+            self.page_template.push(Self::read_initializer(offset, initializer));
+        }
     }
 }
 

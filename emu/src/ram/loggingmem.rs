@@ -78,6 +78,11 @@ impl<T: OpsLogging> LoggingMem<T> {
     pub fn diffs(&self) -> DiffIter {
         self.mem.diffs()
     }
+
+    pub fn reset(&mut self, initializer: u32) {
+        self.initializer = initializer;
+        self.mem.reset(initializer);
+    }
 }
 
 impl<T: OpsLogging> AddressBus for LoggingMem<T> {

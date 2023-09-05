@@ -180,6 +180,13 @@ extern crate once_cell;
 use self::once_cell::sync::Lazy;
 use cpu::TestCore;
 pub static INSTRUCTION_SET_TEST: Lazy<std::sync::Arc<InstructionSet<TestCore>>> = Lazy::new(|| std::sync::Arc::new(instruction_set::<TestCore>()));
+pub static OPCODES_ALL_LEGAL: Lazy<std::sync::Arc<Vec<u16>>> = Lazy::new(|| 
+    (0u32..0x10000u32)
+            .filter(|opcode| crate::cpu::ops::INSTRUCTION_SET_TEST[*opcode as usize] != crate::cpu::ops::illegal)
+            .map(|v| v as u16)
+            .collect::<Vec<u16>>()
+            .into()
+);
 
 use std::num::Wrapping;
 use super::operator;

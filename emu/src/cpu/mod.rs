@@ -546,6 +546,30 @@ impl TestCore {
             fc_is_data: false,
         }
     }
+    pub fn reset_mem(&mut self, base: u32, contents: &[u8], initializer: u32) {
+        self.mem.reset(initializer);
+        for (offset, byte) in contents.iter().enumerate() {
+            self.mem.write_u8(base + offset as u32, u32::from(*byte));
+        }
+        self.pc = base;
+        self.prefetch_addr = 0;
+        self.prefetch_data = 0;
+        self.inactive_ssp = 0;
+        self.inactive_usp = 0;
+        self.ir = 0;
+        self.processing_state = ProcessingState::Normal;
+        self.dar.fill(0);
+        self.irq_level = 0;
+        self.int_ctrl.reset_external_devices();
+        self.s_flag = SFLAG_SET;
+        self.int_mask = CPU_SR_INT_MASK;
+        self.x_flag = 0;
+        self.v_flag = 0;
+        self.c_flag = 0;
+        self.n_flag = 0;
+        self.not_z_flag = 0xffff_ffff;
+        self.fc_is_data = false;
+    }
 }
 
 impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {

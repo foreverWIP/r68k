@@ -4,4 +4,7 @@ members = ["emu", "tools", "common"]
 [profile.test]
 opt-level = 2
 overflow-checks = false
-lto = true
+lto = "off"
+
+[profile.release]
+debug = true
