@@ -76,10 +76,11 @@ use ram::loggingmem::Operation;
 use ram::{
     AddressSpace, ADDRBUS_MASK, SUPERVISOR_DATA, SUPERVISOR_PROGRAM, USER_DATA, USER_PROGRAM,
 };
-static mut MUSASHI_LOCATIONS_USED: usize = 0;
+// static mut MUSASHI_LOCATIONS_USED: usize = 0;
 static mut MUSASHI_MEMORY_INITIALIZER: u32 = 0xaaaaaaaa;
-static mut MUSASHI_MEMORY_LOCATION: [u32; 1024] = [0; 1024];
-static mut MUSASHI_MEMORY_DATA: [u8; 1024] = [0; 1024];
+// static mut MUSASHI_MEMORY_LOCATION: [u32; 1024] = [0; 1024];
+// static mut MUSASHI_MEMORY_DATA: [u8; 1024] = [0; 1024];
+static mut MUSASHI_MEMORY: [u8; 0x1_00_0000] = [0xaau8; 0x1_00_0000];
 
 // as statics are not allowed to have destructors, allocate a
 // big enough array to hold the small number of operations
@@ -207,25 +208,26 @@ unsafe fn read_initializer(address: u32) -> u8 {
     };
     ((MUSASHI_MEMORY_INITIALIZER >> shift) & 0xFF) as u8
 }
-unsafe fn find_musashi_location(address: u32) -> Option<usize> {
+/*unsafe fn find_musashi_location(address: u32) -> Option<usize> {
     for i in 0..MUSASHI_LOCATIONS_USED {
         if MUSASHI_MEMORY_LOCATION[i as usize] == address {
             return Some(i as usize);
         }
     }
     None
-}
+}*/
 unsafe fn read_musashi_byte(address: u32) -> u8 {
     let address = address & ADDRBUS_MASK;
-    if let Some(index) = find_musashi_location(address) {
+    /*if let Some(index) = find_musashi_location(address) {
         MUSASHI_MEMORY_DATA[index]
     } else {
         read_initializer(address)
-    }
+    }*/
+    MUSASHI_MEMORY[address as usize]
 }
 unsafe fn write_musashi_byte(address: u32, data: u8) {
     let address = address & ADDRBUS_MASK;
-    let write_differs_from_initializer = data != read_initializer(address);
+    /*let write_differs_from_initializer = data != read_initializer(address);
     if write_differs_from_initializer {
         if let Some(index) = find_musashi_location(address) {
             MUSASHI_MEMORY_DATA[index] = data;
@@ -234,7 +236,8 @@ unsafe fn write_musashi_byte(address: u32, data: u8) {
             MUSASHI_MEMORY_DATA[MUSASHI_LOCATIONS_USED] = data;
             MUSASHI_LOCATIONS_USED += 1;
         }
-    }
+    }*/
+    MUSASHI_MEMORY[address as usize] = data;
 }
 
 #[no_mangle]
@@ -327,6 +330,7 @@ fn get_ops() -> Vec<Operation> {
 pub fn initialize_musashi(core: &mut TestCore, memory_initializer: u32) {
     // println!("initialize_musashi {:?}", thread::current());
     unsafe {
+        m68ki_address_space = 5;
         initialize_musashi_memory(memory_initializer);
         m68k_init();
         m68k_set_cpu_type(CpuType::M68000);
@@ -350,23 +354,27 @@ pub fn initialize_musashi(core: &mut TestCore, memory_initializer: u32) {
             }
         }
         // just copy diffs, as it takes too long to reset all 16MB
-        for (addr, byte) in core.mem.diffs() {
+        /*for (addr, byte) in core.mem.diffs() {
             write_musashi_byte(addr, byte);
-        }
+        }*/
+        MUSASHI_MEMORY.copy_from_slice(&crate::ram::loggingmem::TESTCORE_MEMORY);
     }
 }
 
 pub fn initialize_musashi_memory(initializer: u32) {
-    unsafe {
+    /*unsafe {
         MUSASHI_MEMORY_INITIALIZER = initializer;
         MUSASHI_OPCOUNT = 0;
         MUSASHI_LOCATIONS_USED = 0;
         m68k_set_fc(SUPERVISOR_PROGRAM.fc());
+    }*/
+    unsafe {
+        crate::ram::loggingmem::fast_copy(&mut MUSASHI_MEMORY, initializer);
     }
 }
-pub fn musashi_written_bytes() -> u16 {
+/*pub fn musashi_written_bytes() -> u16 {
     unsafe { MUSASHI_LOCATIONS_USED as u16 }
-}
+}*/
 const EXEC_CYCLES: i32 = 1; // configurable for testing purposes
 pub fn execute1(core: &mut TestCore) -> Cycles {
     execute(core, 1)
@@ -423,9 +431,7 @@ macro_rules! set_lock {
 }
 #[macro_export]
 macro_rules! release_lock {
-    ($lock:ident) => {
-        
-    };
+    ($lock:ident) => {};
 }
 
 #[macro_use]
@@ -579,20 +585,31 @@ mod tests {
     extern crate once_cell;
     static mut MUSASHI_CORE: Option<TestCore> = None;
 
-    fn hammer_cores_even_addresses(memory_pattern: Bitpattern, rs: Vec<(Register, Bitpattern)>) -> TestResult {
-        let mem_mask = (2<<24)-2; // keep even
+    fn hammer_cores_even_addresses(
+        memory_pattern: Bitpattern,
+        rs: Vec<(Register, Bitpattern)>,
+    ) -> TestResult {
+        let mem_mask = (2 << 24) - 2; // keep even
         hammer_cores_with(mem_mask, memory_pattern, rs, false)
     }
     fn hammer_cores(memory_pattern: Bitpattern, rs: Vec<(Register, Bitpattern)>) -> TestResult {
-        let mem_mask = (2<<24)-1; // allow odd
+        let mem_mask = (2 << 24) - 1; // allow odd
         hammer_cores_with(mem_mask, memory_pattern, rs, false)
     }
-    fn hammer_cores_allow_exception(memory_pattern: Bitpattern, rs: Vec<(Register, Bitpattern)>) -> TestResult {
-        let mem_mask = (2<<24)-2; // keep even
+    fn hammer_cores_allow_exception(
+        memory_pattern: Bitpattern,
+        rs: Vec<(Register, Bitpattern)>,
+    ) -> TestResult {
+        let mem_mask = (2 << 24) - 2; // keep even
         hammer_cores_with(mem_mask, memory_pattern, rs, true)
     }
 
-    fn hammer_cores_with(mem_mask: u32, memory_pattern: Bitpattern, rs: Vec<(Register, Bitpattern)>, allow_exception: bool) -> TestResult {  
+    fn hammer_cores_with(
+        mem_mask: u32,
+        memory_pattern: Bitpattern,
+        rs: Vec<(Register, Bitpattern)>,
+        allow_exception: bool,
+    ) -> TestResult {
         let pc = 0x140;
         let mem = unsafe {
             [
@@ -602,7 +619,11 @@ mod tests {
         };
         let Bitpattern(memory_initializer) = memory_pattern;
         unsafe {
-            fn setup_musashi_core(musashi: &mut TestCore, mem_mask: u32, rs: Vec<(Register, Bitpattern)>) {
+            fn setup_musashi_core(
+                musashi: &mut TestCore,
+                mem_mask: u32,
+                rs: Vec<(Register, Bitpattern)>,
+            ) {
                 const STACK_MASK: u32 = 1024 - 16; // keep even
                 musashi.inactive_ssp = 0x128;
                 musashi.inactive_usp = 0x256;
@@ -648,7 +669,9 @@ mod tests {
                         (Register::A5, Bitpattern(bp)) => musashi.dar[5 + 8] = bp & mem_mask,
                         (Register::A6, Bitpattern(bp)) => musashi.dar[6 + 8] = bp & mem_mask,
                         (Register::A7, Bitpattern(bp)) => musashi.dar[7 + 8] = bp & STACK_MASK + 8,
-                        (Register::USP, Bitpattern(bp)) => musashi.inactive_usp = bp & STACK_MASK + 8,
+                        (Register::USP, Bitpattern(bp)) => {
+                            musashi.inactive_usp = bp & STACK_MASK + 8
+                        }
                         (Register::SR, Bitpattern(bp)) => musashi.sr_to_flags(bp as u16),
                         _ => {
                             panic!("No idea how to set {:?}", r.0)
@@ -658,7 +681,12 @@ mod tests {
                 musashi.s_flag = 4;
             }
 
-            fn test_cores(musashi: &mut TestCore, mem_mask: u32, memory_initializer: u32, allow_exception: bool) -> TestResult {
+            fn test_cores(
+                musashi: &mut TestCore,
+                mem_mask: u32,
+                memory_initializer: u32,
+                allow_exception: bool,
+            ) -> TestResult {
                 let mut r68k = musashi.clone(); // so very self-aware!
 
                 let musashi_cycles = reset_and_execute1(musashi, memory_initializer & mem_mask);
@@ -669,18 +697,18 @@ mod tests {
                 // the same spot) and we allow exceptions (or we would discard
                 // all results for those instructions that always result  in
                 // exceptions such as illegal/unimplemented or traps)
-                let can_compare_cycles = if let Some(vector) = memory_accesses_equal_unless_exception(&r68k)
-                {
-                    if musashi.pc != r68k.pc || !allow_exception {
-                        return TestResult::discard();
+                let can_compare_cycles =
+                    if let Some(vector) = memory_accesses_equal_unless_exception(&r68k) {
+                        if musashi.pc != r68k.pc || !allow_exception {
+                            return TestResult::discard();
+                        } else {
+                            // cannot compare cycles due to differences with
+                            // Musashis handling of CHK and DIV exceptions
+                            vector != EXCEPTION_ZERO_DIVIDE && vector != EXCEPTION_CHK
+                        }
                     } else {
-                        // cannot compare cycles due to differences with
-                        // Musashis handling of CHK and DIV exceptions
-                        vector != EXCEPTION_ZERO_DIVIDE && vector != EXCEPTION_CHK
-                    }
-                } else {
-                    true
-                };
+                        true
+                    };
                 let ret = if cores_equal(&musashi, &r68k) {
                     if can_compare_cycles && musashi_cycles != r68k_cycles {
                         println!("Musashi {:?} but r68k {:?}", musashi_cycles, r68k_cycles);
@@ -697,7 +725,8 @@ mod tests {
                 setup_musashi_core(core, mem_mask, rs);
                 test_cores(core, mem_mask, memory_initializer, allow_exception)
             } else {
-                let mut core = TestCore::new_mem_init_for_tests(pc, &mem, memory_initializer & mem_mask);
+                let mut core =
+                    TestCore::new_mem_init_for_tests(pc, &mem, memory_initializer & mem_mask);
                 setup_musashi_core(&mut core, mem_mask, rs);
                 let ret = test_cores(&mut core, mem_mask, memory_initializer, allow_exception);
                 MUSASHI_CORE = Some(core.clone());
@@ -733,8 +762,7 @@ mod tests {
                 const QC_ROUNDS: usize = 256;
 
                 // for opcode in $opcode..($opcode + BLOCK_SIZE)
-                for opcode in opcodes($opmask, $opcode)
-                {
+                for opcode in opcodes($opmask, $opcode) {
                     println!("Hammering {:016b} {} times", opcode, QC_ROUNDS);
                     unsafe {
                         // this is because I don't know how to make
@@ -3217,7 +3245,7 @@ mod tests {
         ::release_lock!(MUSASHI_LOCK);
     }
 
-    #[test]
+    /*#[test]
     fn page_allocation_on_write_unless_matching_initializer() {
         ::set_lock!(MUSASHI_LOCK);
 
@@ -3246,7 +3274,7 @@ mod tests {
         assert_eq!(263, ops.len());
 
         ::release_lock!(MUSASHI_LOCK);
-    }
+    }*/
 
     #[test]
     fn cross_boundary_byte_access() {
