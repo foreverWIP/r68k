@@ -1,16 +1,15 @@
+#!/bin/bash
 # ensure code is compiled once, before parallelizing
 echo Compiling and running standard tests...
-OPS=""
-while [ $# -gt 0 ]; do
-	OPS="$OPS${BAR:-}$1"
-	BAR="|"
-	shift
-done
-echo OPS: $OPS
-cargo test | grep "test result"
+results=target/debug/qc-results
+rm -rf $results
+mkdir -p $results
+OPS=$(cargo test -- --list 2> /dev/null | head -n -3 | rev | cut -c 7- | rev)
+cargo test --no-run
 if [ ${PIPESTATUS[0]} -eq 0 ]; then
-	results=target/debug/qc-results
-	mkdir $results
-	cargo test | grep "\. ignored" | sed -E 's/^.*(qc_[[:alnum:]_]+).*$/\1/g' | grep -E "$OPS" | time parallel --results $results --nice 10 --eta ./qc
-	./find-errs
+  TESTEXE=""
+  for file in ../target/debug/deps/*; do
+    [[ -x $file ]] && [[ $file -nt $TESTEXE ]] && TESTEXE=$file
+  done
+  RUST_BACKTRACE=1 time parallel "$TESTEXE {} > $results/{}.log; if [ \$? -eq 0 ]; then rm $results/{}.log; fi" ::: $OPS
 fi
