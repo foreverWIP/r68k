@@ -2869,8 +2869,12 @@ mod tests {
         let ops = get_ops();
         assert_eq!(2, ops.len());
         assert_eq!(
-            Operation::ReadLong(SUPERVISOR_PROGRAM, pc, 0xc1010000),
+            Operation::ReadWord(SUPERVISOR_PROGRAM, pc, 0xc101),
             ops[0]
+        );
+        assert_eq!(
+            Operation::ReadWord(SUPERVISOR_PROGRAM, pc + 2, 0x0000),
+            ops[1]
         );
 
         ::release_lock!(MUSASHI_LOCK);
