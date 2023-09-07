@@ -40,33 +40,36 @@ impl fmt::Debug for Operation {
 }
 
 pub trait OpsLogging {
-    fn log(&self, op: Operation);
+    fn log(&mut self, op: Operation);
 }
 
 #[derive(Default)]
 pub struct OpsLogger {
     log: RefCell<Vec<Operation>>,
+    count: usize,
 }
 
 impl OpsLogger {
     pub fn new() -> OpsLogger {
         OpsLogger {
             log: RefCell::new(Vec::new()),
+            count: 0
         }
     }
     pub fn ops(&self) -> Vec<Operation> {
         self.log.borrow_mut().clone()
     }
     pub fn len(&self) -> usize {
-        self.log.borrow_mut().len()
+        self.count
     }
     pub fn is_empty(&self) -> bool {
-        self.log.borrow_mut().is_empty()
+        self.count == 0
     }
 }
 impl OpsLogging for OpsLogger {
-    fn log(&self, op: Operation) {
+    fn log(&mut self, op: Operation) {
         self.log.borrow_mut().push(op);
+        self.count += 1;
     }
 }
 
@@ -112,7 +115,7 @@ impl<T: OpsLogging> AddressBus for LoggingMem<T> {
         }
     }
 
-    fn read_byte(&self, address_space: AddressSpace, address: u32) -> u32 {
+    fn read_byte(&mut self, address_space: AddressSpace, address: u32) -> u32 {
         let value = self.read_u8(address);
         self.logger.log(Operation::ReadByte(
             address_space,
@@ -122,7 +125,7 @@ impl<T: OpsLogging> AddressBus for LoggingMem<T> {
         value
     }
 
-    fn read_word(&self, address_space: AddressSpace, address: u32) -> u32 {
+    fn read_word(&mut self, address_space: AddressSpace, address: u32) -> u32 {
         let value = (self.read_u8(address) << 8 | self.read_u8(address.wrapping_add(1))) as u32;
         self.logger.log(Operation::ReadWord(
             address_space,
@@ -132,7 +135,7 @@ impl<T: OpsLogging> AddressBus for LoggingMem<T> {
         value
     }
 
-    fn read_long(&self, address_space: AddressSpace, address: u32) -> u32 {
+    fn read_long(&mut self, address_space: AddressSpace, address: u32) -> u32 {
         let value = (self.read_u8(address) << 24
             | self.read_u8(address.wrapping_add(1)) << 16
             | self.read_u8(address.wrapping_add(2)) << 8
@@ -230,7 +233,7 @@ mod tests {
     }
 
     fn do_read_byte_is_logged(address: u32) {
-        let mem = LoggingMem::new(0x01020304, OpsLogger::new());
+        let mut mem = LoggingMem::new(0x01020304, OpsLogger::new());
         mem.read_byte(SUPERVISOR_DATA, address);
         assert!(mem.logger.len() > 0);
         assert_eq!(
@@ -240,7 +243,7 @@ mod tests {
     }
 
     fn do_read_word_is_logged(address: u32) {
-        let mem = LoggingMem::new(0x01020304, OpsLogger::new());
+        let mut mem = LoggingMem::new(0x01020304, OpsLogger::new());
         mem.read_word(SUPERVISOR_PROGRAM, address);
         assert!(mem.logger.len() > 0);
         assert_eq!(
@@ -250,7 +253,7 @@ mod tests {
     }
 
     fn do_read_long_is_logged(address: u32) {
-        let mem = LoggingMem::new(0x01020304, OpsLogger::new());
+        let mut mem = LoggingMem::new(0x01020304, OpsLogger::new());
         mem.read_long(USER_DATA, address);
         assert!(mem.logger.len() > 0);
         assert_eq!(

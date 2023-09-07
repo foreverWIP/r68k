@@ -114,16 +114,16 @@ impl AddressBus for PagedMem {
         }
     }
 
-    fn read_byte(&self, _address_space: AddressSpace, address: u32) -> u32 {
+    fn read_byte(&mut self, _address_space: AddressSpace, address: u32) -> u32 {
         self.read_u8(address)
     }
 
-    fn read_word(&self, _address_space: AddressSpace, address: u32) -> u32 {
+    fn read_word(&mut self, _address_space: AddressSpace, address: u32) -> u32 {
         (self.read_u8(address) << 8
         |self.read_u8(address.wrapping_add(1))) as u32
     }
 
-    fn read_long(&self, _address_space: AddressSpace, address: u32) -> u32 {
+    fn read_long(&mut self, _address_space: AddressSpace, address: u32) -> u32 {
         (self.read_u8(address) << 24
         |self.read_u8(address.wrapping_add(1)) << 16
         |self.read_u8(address.wrapping_add(2)) <<  8
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn read_initialized_memory() {
-        let mem = PagedMem::new(0x01020304);
+        let mut mem = PagedMem::new(0x01020304);
         for v in 0..256 {
             assert_eq!(0x01, mem.read_byte(SUPERVISOR_DATA, 4*v+0));
             assert_eq!(0x02, mem.read_byte(SUPERVISOR_DATA, 4*v+1));

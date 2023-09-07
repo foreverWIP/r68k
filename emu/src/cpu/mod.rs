@@ -1051,7 +1051,7 @@ mod tests {
     #[test]
     fn new_mem_sets_pc_and_mem() {
         let base = 128;
-        let cpu = TestCore::new_mem(base, &[1u8, 2u8, 3u8, 4u8, 5u8, 6u8]);
+        let mut cpu = TestCore::new_mem(base, &[1u8, 2u8, 3u8, 4u8, 5u8, 6u8]);
         assert_eq!(128, cpu.pc);
         assert_eq!(1, cpu.mem.read_byte(SUPERVISOR_PROGRAM, 128));
         assert_eq!(2, cpu.mem.read_byte(SUPERVISOR_PROGRAM, 129));
