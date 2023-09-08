@@ -128,7 +128,6 @@ pub extern "C" fn m68k_read_memory_16(address: u32) -> u32 {
 #[no_mangle]
 pub extern "C" fn m68k_read_memory_32(address: u32) -> u32 {
     unsafe {
-        println!("{:}", std::backtrace::Backtrace::force_capture());
         let value = ((read_musashi_byte(address + 0) as u32) << 24
             | (read_musashi_byte(address + 1) as u32) << 16
             | (read_musashi_byte(address + 2) as u32) << 8
