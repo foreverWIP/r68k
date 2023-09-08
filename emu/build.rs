@@ -79,5 +79,5 @@ fn main() {
         let _ = fs::remove_file(musashi_dir.join(Path::new("m68kmake")));
         let _ = fs::remove_file(musashi_dir.join(Path::new("m68kmake.o")));
     }
-    println!("cargo:rerun-if-changed={}", musashi_dir.join(Path::new("m68kconf.h")).to_str().unwrap());
+    println!("cargo:rerun-if-changed={}", musashi_dir.to_str().unwrap());
 }

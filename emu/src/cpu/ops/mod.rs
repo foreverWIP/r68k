@@ -132,12 +132,20 @@ macro_rules! impl_op {
         })
 }
 macro_rules! impl_shift_op {
+    (8, $common:ident, $name:ident, quick, dy, $cycles:expr) => (
+        pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
+            let mut shift = operator::quick(core)?;
+            let dst = dy!(core);
+            let res = common::$common(core, dst, shift);
+                        dy!(core) = mask_out_below_8!(dst) | res;
+            Ok(Cycles($cycles + 4 * shift as i32))
+        });
     (8, $common:ident, $name:ident, $shift_src:ident, dy, $cycles:expr) => (
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let shift = operator::$shift_src(core)? & 0x3f; // mod 64
             let dst = dy!(core);
             let res = common::$common(core, dst, shift);
-            dy!(core) = mask_out_below_8!(dst) | res;
+                        dy!(core) = mask_out_below_8!(dst) | res;
             Ok(Cycles($cycles + 2 * shift as i32))
         });
     (16, $common:ident, $name:ident, 1, $dst:ident, $cycles:expr) => (
@@ -148,6 +156,14 @@ macro_rules! impl_shift_op {
             core.write_word(ea, mask_out_below_16!(dst) | res)?;
             Ok(Cycles($cycles))
         });
+    (16, $common:ident, $name:ident, quick, dy, $cycles:expr) => (
+        pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
+            let shift = operator::quick(core)?;
+            let dst = dy!(core);
+            let res = common::$common(core, dst, shift);
+            dy!(core) = mask_out_below_16!(dst) | res;
+            Ok(Cycles($cycles + 4 * shift as i32))
+        });
     (16, $common:ident, $name:ident, $shift_src:ident, dy, $cycles:expr) => (
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
             let shift = operator::$shift_src(core)? & 0x3f; // mod 64
@@ -155,6 +171,14 @@ macro_rules! impl_shift_op {
             let res = common::$common(core, dst, shift);
             dy!(core) = mask_out_below_16!(dst) | res;
             Ok(Cycles($cycles + 2 * shift as i32))
+        });
+    (32, $common:ident, $name:ident, quick, dy, $cycles:expr) => (
+        pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
+            let shift = operator::quick(core)?;
+            let dst = dy!(core);
+            let res = common::$common(core, dst, shift);
+            dy!(core) = res;
+            Ok(Cycles($cycles + 4 * shift as i32))
         });
     (32, $common:ident, $name:ident, $shift_src:ident, dy, $cycles:expr) => (
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
@@ -2165,7 +2189,8 @@ macro_rules! movem_32_re {
                 if registers & (1 << i) > 0 {
                     ea = ea.wrapping_sub(4);
                     let reg = dar!(core)[15-i];
-                    core.write_long(ea, reg)?;
+                    core.write_word(ea + 2, reg & 0xffff)?;
+                    core.write_word(ea, reg >> 16)?;
                     moves += 1;
                 }
             }
@@ -2180,8 +2205,7 @@ macro_rules! movem_32_re {
             for i in 0..16 {
                 if registers & (1 << i) > 0 {
                     let reg = dar!(core)[i];
-                    core.write_word(ea + 2, reg & 0xffff)?;
-                    core.write_word(ea, reg >> 16)?;
+                    core.write_long(ea, reg)?;
                     ea = ea.wrapping_add(4);
                     moves += 1;
                 }

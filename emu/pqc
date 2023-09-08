@@ -1,11 +1,9 @@
 #!/bin/bash
-# ensure code is compiled once, before parallelizing
 echo Compiling and running standard tests...
 results=target/debug/qc-results
 rm -rf $results
 mkdir -p $results
 OPS=$(cargo test -- --list 2> /dev/null | head -n -3 | rev | cut -c 7- | rev)
-cargo test --no-run
 if [ ${PIPESTATUS[0]} -eq 0 ]; then
   TESTEXE=""
   for file in ../target/debug/deps/*; do

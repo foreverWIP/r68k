@@ -128,6 +128,7 @@ pub extern "C" fn m68k_read_memory_16(address: u32) -> u32 {
 #[no_mangle]
 pub extern "C" fn m68k_read_memory_32(address: u32) -> u32 {
     unsafe {
+        println!("{:}", std::backtrace::Backtrace::force_capture());
         let value = ((read_musashi_byte(address + 0) as u32) << 24
             | (read_musashi_byte(address + 1) as u32) << 16
             | (read_musashi_byte(address + 2) as u32) << 8
@@ -196,6 +197,11 @@ pub extern "C" fn m68k_write_memory_32(address: u32, value: u32) {
         write_musashi_byte(address + 2, ((value & 0x0000ff00) >> 8) as u8);
         write_musashi_byte(address + 3, ((value & 0x000000ff) >> 0) as u8);
     }
+}
+#[no_mangle]
+pub extern "C" fn m68k_write_memory_32_pd(address: u32, value: u32) {
+    m68k_write_memory_16(address + 2, value & 0xffff);
+    m68k_write_memory_16(address, value >> 16);
 }
 // read uninitialized bytes from initializer instead
 unsafe fn read_initializer(address: u32) -> u8 {
@@ -340,7 +346,7 @@ pub fn initialize_musashi(core: &mut TestCore, memory_initializer: u32) {
         // reads from 0x00000000 to set PC/SP, a jump to PC and
         // resetting of state. But we don't want to test those ops.
         MUSASHI_OPCOUNT = 0;
-        //m68k_set_reg(Register::PC, core.pc);
+        m68k_set_reg(Register::PC, core.pc);
         // if SR clears S_FLAG then SSP <- A7, A7 <- USP
         m68k_set_reg(Register::SR, core.status_register() as u32);
         m68k_set_reg(Register::USP, core.usp());
@@ -365,9 +371,9 @@ pub fn initialize_musashi_memory(initializer: u32) {
         m68k_set_fc(SUPERVISOR_PROGRAM.fc());
     }
 }
-/*pub fn musashi_written_bytes() -> u16 {
+pub fn musashi_written_bytes() -> u16 {
     unsafe { MUSASHI_LOCATIONS_USED as u16 }
-}*/
+}
 const EXEC_CYCLES: i32 = 1; // configurable for testing purposes
 pub fn execute1(core: &mut TestCore) -> Cycles {
     execute(core, 1)
@@ -410,9 +416,10 @@ pub fn reset_and_execute1(core: &mut TestCore, memory_initializer: u32) -> Cycle
 // global/static context, and statics are not allowed to have
 // destructors
 use std::sync::Mutex;
+use std::sync::TryLockError::Poisoned;
+use std::sync::TryLockError::WouldBlock;
 
 static MUSASHI_LOCK: Mutex<bool> = Mutex::new(false);
-static QUICKCHECK_LOCK: Mutex<bool> = Mutex::new(false);
 #[macro_export]
 macro_rules! set_lock {
     ($lock:ident) => {
@@ -430,7 +437,6 @@ macro_rules! release_lock {
 #[macro_use]
 mod tests {
     use super::MUSASHI_LOCK;
-    use super::QUICKCHECK_LOCK;
     use super::*;
     use cpu::{Cycles, TestCore, EXCEPTION_CHK, EXCEPTION_ZERO_DIVIDE};
     use musashi::tests::rand::Rng;
@@ -665,7 +671,9 @@ mod tests {
                         (Register::USP, Bitpattern(bp)) => {
                             musashi.inactive_usp = bp & STACK_MASK + 8
                         }
-                        (Register::SR, Bitpattern(bp)) => musashi.sr_to_flags(bp as u16),
+                        (Register::SR, Bitpattern(bp)) => {
+                            // musashi.sr_to_flags(bp as u16)
+                        },
                         _ => {
                             panic!("No idea how to set {:?}", r.0)
                         }
@@ -748,7 +756,7 @@ mod tests {
             fn $fn_name() {
                 // Musashi isn't thread safe, and the construct with OPCODE_UNDER_TEST
                 // isn't either. :(
-                ::set_lock!(QUICKCHECK_LOCK);
+                ::set_lock!(MUSASHI_LOCK);
                 // check for mask/opcode inconsistency
                 assert!($opmask & $opcode == $opcode);
 
@@ -771,7 +779,7 @@ mod tests {
                         .quickcheck($hammer as fn(_, _) -> _);
                 }
 
-                ::release_lock!(QUICKCHECK_LOCK);
+                ::release_lock!(MUSASHI_LOCK);
             }
         };
     }
@@ -3242,7 +3250,7 @@ mod tests {
         ::release_lock!(MUSASHI_LOCK);
     }
 
-    /*#[test]
+    #[test]
     fn page_allocation_on_write_unless_matching_initializer() {
         ::set_lock!(MUSASHI_LOCK);
 
@@ -3271,7 +3279,7 @@ mod tests {
         assert_eq!(263, ops.len());
 
         ::release_lock!(MUSASHI_LOCK);
-    }*/
+    }
 
     #[test]
     fn cross_boundary_byte_access() {
