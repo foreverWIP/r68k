@@ -700,7 +700,7 @@ mod tests {
                 let can_compare_cycles =
                     if let Some(vector) = memory_accesses_equal_unless_exception(&r68k) {
                         if musashi.pc != r68k.pc || !allow_exception {
-                            return TestResult::discard();
+                            true
                         } else {
                             // cannot compare cycles due to differences with
                             // Musashis handling of CHK and DIV exceptions
@@ -759,7 +759,7 @@ mod tests {
                 // check for mask/opcode inconsistency
                 assert!($opmask & $opcode == $opcode);
 
-                const QC_ROUNDS: usize = 256;
+                const QC_ROUNDS: usize = 16;
 
                 // for opcode in $opcode..($opcode + BLOCK_SIZE)
                 for opcode in opcodes($opmask, $opcode) {

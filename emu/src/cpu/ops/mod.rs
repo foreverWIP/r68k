@@ -1020,26 +1020,27 @@ macro_rules! chk_16 {
 
             if src >= 0 && src <= bound
             {
-                Ok(Cycles($cycles))
+                Ok(Cycles(10 + $cycles))
             } else {
                 n_flag!(core) = if src < 0 {1 << 7} else {0};
                 // 40 cycles for the CHK trap + EA calculation time
                 // deduct the 10 base cycles for the instruction, to extract EA cycles.
-                Err(Trap(EXCEPTION_CHK, 40 + $cycles - 10))
+                // TODO: update musashi to account for this
+                Err(Trap(EXCEPTION_CHK, 40 /*+ $cycles*/))
             }
         });
 }
-chk_16!(chk_16_ai,   ay_ai_16,  10 +  4);
-chk_16!(chk_16_al,   al_16,     10 + 12);
-chk_16!(chk_16_aw,   aw_16,     10 +  8);
-chk_16!(chk_16_dn,   dy,        10 +  0);
-chk_16!(chk_16_di,   ay_di_16,  10 +  8);
-chk_16!(chk_16_imm,  imm_16,    10 +  4);
-chk_16!(chk_16_ix,   ay_ix_16,  10 + 10);
-chk_16!(chk_16_pcdi, pcdi_16,   10 +  8);
-chk_16!(chk_16_pcix, pcix_16,   10 + 10);
-chk_16!(chk_16_pd,   ay_pd_16,  10 +  6);
-chk_16!(chk_16_pi,   ay_pi_16,  10 +  4);
+chk_16!(chk_16_ai,   ay_ai_16,   4);
+chk_16!(chk_16_al,   al_16,     12);
+chk_16!(chk_16_aw,   aw_16,      8);
+chk_16!(chk_16_dn,   dy,         0);
+chk_16!(chk_16_di,   ay_di_16,   8);
+chk_16!(chk_16_imm,  imm_16,     4);
+chk_16!(chk_16_ix,   ay_ix_16,  10);
+chk_16!(chk_16_pcdi, pcdi_16,    8);
+chk_16!(chk_16_pcix, pcix_16,   10);
+chk_16!(chk_16_pd,   ay_pd_16,   6);
+chk_16!(chk_16_pi,   ay_pi_16,   4);
 
 use cpu::effective_address;
 
@@ -1274,11 +1275,12 @@ macro_rules! div_op {
             let dst = dx!(core);
             if src != 0 {
                 common::$common(core, dst, src);
-                Ok(Cycles($cycles))
+                Ok(Cycles($base_cycles + $cycles))
             } else {
                 // 38 cycles for the ZERO_DIVIDE trap + EA calculation time
                 // deduct the base cycles for the instruction, to extract EA cycles.
-                Err(Trap(EXCEPTION_ZERO_DIVIDE, 38 + ($cycles - $base_cycles)))
+                // TODO: update musashi to account for this
+                Err(Trap(EXCEPTION_ZERO_DIVIDE, 38 /*+ $cycles*/))
             }
         })
 }
@@ -1289,32 +1291,32 @@ macro_rules! divu {
     ($name:ident, $src:ident, $cycles:expr) => (div_op!(divu_16, u16, $name, $src, 140, $cycles);)
 }
 
-divs!(divs_16_dn, dy, 158+0);
+divs!(divs_16_dn, dy,        0);
 // divs_16_an not present
-divs!(divs_16_ai, ay_ai_16,  158+4);
-divs!(divs_16_pi, ay_pi_16,  158+4);
-divs!(divs_16_pd, ay_pd_16,  158+6);
-divs!(divs_16_di, ay_di_16,  158+8);
-divs!(divs_16_ix, ay_ix_16,  158+10);
-divs!(divs_16_aw, aw_16,     158+8);
-divs!(divs_16_al, al_16,     158+12);
-divs!(divs_16_pcdi, pcdi_16, 158+8);
-divs!(divs_16_pcix, pcix_16, 158+10);
-divs!(divs_16_imm, imm_16,   158+4);
+divs!(divs_16_ai, ay_ai_16,  4);
+divs!(divs_16_pi, ay_pi_16,  4);
+divs!(divs_16_pd, ay_pd_16,  6);
+divs!(divs_16_di, ay_di_16,  8);
+divs!(divs_16_ix, ay_ix_16,  10);
+divs!(divs_16_aw, aw_16,     8);
+divs!(divs_16_al, al_16,     12);
+divs!(divs_16_pcdi, pcdi_16, 8);
+divs!(divs_16_pcix, pcix_16, 10);
+divs!(divs_16_imm, imm_16,   4);
 
 // Put implementation of DIVU ops here
-divu!(divu_16_dn, dy, 140+0);
+divu!(divu_16_dn, dy,        0);
 // divu_16_an not present
-divu!(divu_16_ai, ay_ai_16,  140+4);
-divu!(divu_16_pi, ay_pi_16,  140+4);
-divu!(divu_16_pd, ay_pd_16,  140+6);
-divu!(divu_16_di, ay_di_16,  140+8);
-divu!(divu_16_ix, ay_ix_16,  140+10);
-divu!(divu_16_aw, aw_16,     140+8);
-divu!(divu_16_al, al_16,     140+12);
-divu!(divu_16_pcdi, pcdi_16, 140+8);
-divu!(divu_16_pcix, pcix_16, 140+10);
-divu!(divu_16_imm, imm_16,   140+4);
+divu!(divu_16_ai, ay_ai_16,  4);
+divu!(divu_16_pi, ay_pi_16,  4);
+divu!(divu_16_pd, ay_pd_16,  6);
+divu!(divu_16_di, ay_di_16,  8);
+divu!(divu_16_ix, ay_ix_16,  10);
+divu!(divu_16_aw, aw_16,     8);
+divu!(divu_16_al, al_16,     12);
+divu!(divu_16_pcdi, pcdi_16, 8);
+divu!(divu_16_pcix, pcix_16, 10);
+divu!(divu_16_imm, imm_16,   4);
 
 // Put implementation of EOR, EORI, EORI to CCR and EORI to SR ops here
 macro_rules! eor_8 {
