@@ -1,5 +1,4 @@
-pub trait InterruptController
-{
+pub trait InterruptController {
     fn reset_external_devices(&mut self); // triggered by RESET instruction
     fn highest_priority(&self) -> u8;
     fn acknowledge_interrupt(&mut self, priority: u8) -> Option<u8>;
@@ -10,25 +9,23 @@ pub const UNINITIALIZED_INTERRUPT: u8 = 0x0F;
 pub const SPURIOUS_INTERRUPT: u8 = 0x18;
 const AUTOVECTOR_BASE: u8 = 0x18;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct AutoInterruptController {
-    level: u8
+    level: u8,
 }
 impl AutoInterruptController {
     pub fn new() -> AutoInterruptController {
         AutoInterruptController { level: 0 }
     }
 
-    pub fn request_interrupt(&mut self, irq: u8) -> u8
-    {
+    pub fn request_interrupt(&mut self, irq: u8) -> u8 {
         assert!(irq > 0 && irq < 8);
         self.level |= 1 << (irq - 1);
         self.level
     }
 }
 impl InterruptController for AutoInterruptController {
-    fn reset_external_devices(&mut self)
-    {
+    fn reset_external_devices(&mut self) {
         // not a required effect of the RESET instruction, but assuming that
         // any external devices reset, also reset their
         // interrupt request state
@@ -45,11 +42,9 @@ impl InterruptController for AutoInterruptController {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use super::{InterruptController, AutoInterruptController,
-        AUTOVECTOR_BASE};
+    use super::{AutoInterruptController, InterruptController, AUTOVECTOR_BASE};
 
     #[test]
     fn keeps_track_of_priority() {
