@@ -85,7 +85,6 @@ pub trait Core {
     fn allow_tas_writeback(&mut self) -> bool;
 }
 
-#[derive(Clone)]
 pub struct ConfiguredCore<T: InterruptController, A: AddressBus> {
     pub pc: u32,
     pub inactive_ssp: u32, // when in user mode
