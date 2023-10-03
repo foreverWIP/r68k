@@ -200,10 +200,15 @@ pub fn instruction_set<T: Core>() -> InstructionSet<T> {
     handlers::InstructionSetGenerator::new().generate()
 }
 
+#[cfg(test)]
 extern crate once_cell;
+#[cfg(test)]
 use self::once_cell::sync::Lazy;
+#[cfg(test)]
 use cpu::TestCore;
+#[cfg(test)]
 pub static INSTRUCTION_SET_TEST: Lazy<std::sync::Arc<InstructionSet<TestCore>>> = Lazy::new(|| std::sync::Arc::new(instruction_set::<TestCore>()));
+#[cfg(test)]
 pub static OPCODES_ALL_LEGAL: Lazy<std::sync::Arc<Vec<u16>>> = Lazy::new(|| 
     (0u32..0x10000u32)
             .filter(|opcode| crate::cpu::ops::INSTRUCTION_SET_TEST[*opcode as usize] != crate::cpu::ops::illegal)

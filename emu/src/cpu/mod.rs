@@ -533,6 +533,7 @@ impl TestCore {
             fc_is_data: false,
         }
     }
+    #[cfg(test)]
     pub fn new_mem_init_for_tests(base: u32, contents: &[u8], initializer: u32) -> TestCore {
         let mut lm = LoggingMem::new(initializer, OpsLogger::new());
         for (offset, byte) in contents.iter().enumerate() {
