@@ -1,23 +1,23 @@
 // type alias for exception handling
 use std::result;
 pub type Result<T> = result::Result<T, Exception>;
-use interrupts::{AutoInterruptController, InterruptController, SPURIOUS_INTERRUPT};
+use interrupts::{InterruptController, AutoInterruptController, SPURIOUS_INTERRUPT};
 use ram::loggingmem::{LoggingMem, OpsLogger};
 pub type TestCore = ConfiguredCore<AutoInterruptController, LoggingMem<OpsLogger>>;
 pub type Handler<T> = fn(&mut T) -> Result<Cycles>;
 pub type InstructionSet<T> = Vec<Handler<T>>;
-use ram::{AddressBus, SUPERVISOR_DATA, SUPERVISOR_PROGRAM, USER_DATA, USER_PROGRAM};
+use ram::{AddressBus, SUPERVISOR_PROGRAM, SUPERVISOR_DATA, USER_PROGRAM, USER_DATA};
+pub mod ops;
 mod effective_address;
 mod operator;
-pub mod ops;
 
 pub trait Core {
-    fn pc(&mut self) -> &mut u32;
+    fn pc(&mut self) -> &mut  u32;
     fn ir(&mut self) -> u16;
-    fn ax(&mut self) -> &mut u32;
-    fn ay(&mut self) -> &mut u32;
-    fn dx(&mut self) -> &mut u32;
-    fn dy(&mut self) -> &mut u32;
+    fn ax(&mut self) -> &mut  u32;
+    fn ay(&mut self) -> &mut  u32;
+    fn dx(&mut self) -> &mut  u32;
+    fn dy(&mut self) -> &mut  u32;
     fn c_flag(&mut self) -> &mut u32;
     fn v_flag(&mut self) -> &mut u32;
     fn n_flag(&mut self) -> &mut u32;
@@ -133,22 +133,22 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
         let dy = ir_dy!(self);
         &mut self.dar[dy]
     }
-    fn c_flag(&mut self) -> &mut u32 {
+    fn c_flag(&mut self) -> &mut u32{
         &mut self.c_flag
     }
-    fn v_flag(&mut self) -> &mut u32 {
+    fn v_flag(&mut self) -> &mut u32{
         &mut self.v_flag
     }
-    fn n_flag(&mut self) -> &mut u32 {
+    fn n_flag(&mut self) -> &mut u32{
         &mut self.n_flag
     }
-    fn s_flag(&mut self) -> &mut u32 {
+    fn s_flag(&mut self) -> &mut u32{
         &mut self.s_flag
     }
-    fn x_flag(&mut self) -> &mut u32 {
+    fn x_flag(&mut self) -> &mut u32{
         &mut self.x_flag
     }
-    fn not_z_flag(&mut self) -> &mut u32 {
+    fn not_z_flag(&mut self) -> &mut u32{
         &mut self.not_z_flag
     }
     fn x_flag_as_1(&self) -> u32 {
@@ -357,8 +357,8 @@ pub const STACK_POINTER_REG: usize = 15;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Cycles(pub i32);
 
-use std::ops::Add;
 use std::ops::Sub;
+use std::ops::Add;
 impl Sub for Cycles {
     type Output = Cycles;
 
@@ -392,12 +392,12 @@ impl Callbacks for EmulateAllExceptions {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum ProcessingState {
-    Normal,          // Executing instructions
-    Group2Exception, // TRAP(V), CHK, ZeroDivide
-    Group1Exception, // Trace, Interrupt, IllegalInstruction, PrivilegeViolation
-    Group0Exception, // AddressError, BusError, ExternalReset
-    Stopped,         // Trace, Interrupt or ExternalReset needed to resume
-    Halted,          // ExternalReset needed to resume
+    Normal,             // Executing instructions
+    Group2Exception,    // TRAP(V), CHK, ZeroDivide
+    Group1Exception,    // Trace, Interrupt, IllegalInstruction, PrivilegeViolation
+    Group0Exception,    // AddressError, BusError, ExternalReset
+    Stopped,            // Trace, Interrupt or ExternalReset needed to resume
+    Halted,             // ExternalReset needed to resume
 }
 
 impl ProcessingState {
@@ -409,80 +409,57 @@ impl ProcessingState {
         match self {
             ProcessingState::Normal => true,
             ProcessingState::Group2Exception => true,
-            _ => false,
+            _ => false
         }
     }
     pub fn running(self) -> bool {
         match self {
             ProcessingState::Stopped => false,
             ProcessingState::Halted => false,
-            _ => true,
+            _ => true
         }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
-pub enum AccessType {
-    Read,
-    Write,
-}
+pub enum AccessType {Read, Write}
 use ram::AddressSpace;
 
 #[derive(Clone, Copy, Debug)]
 pub enum Exception {
-    AddressError {
-        address: u32,
-        access_type: AccessType,
-        processing_state: ProcessingState,
-        address_space: AddressSpace,
-    },
-    IllegalInstruction(u16, u32),           // ir, pc
-    Trap(u8, i32),                          // trap no, exception cycles
-    PrivilegeViolation(u16, u32),           // ir, pc
+    AddressError { address: u32, access_type: AccessType, processing_state: ProcessingState, address_space: AddressSpace},
+    IllegalInstruction(u16, u32), // ir, pc
+    Trap(u8, i32),                // trap no, exception cycles
+    PrivilegeViolation(u16, u32), // ir, pc
     UnimplementedInstruction(u16, u32, u8), // ir, pc, vector no
-    Interrupt(u8, u8),                      // irq, vector no
+    Interrupt(u8, u8), // irq, vector no
 }
 use std::fmt;
 impl fmt::Display for Exception {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Exception::AddressError {
-                address,
-                access_type,
-                processing_state,
-                address_space,
-            } => write!(
-                f,
-                "Address Error: {:?} {:?} at {:08x} during {:?} processing",
-                access_type, address_space, address, processing_state
-            ),
-            Exception::IllegalInstruction(ir, pc) => {
-                write!(f, "Illegal Instruction {:04x} at {:08x}", ir, pc)
-            }
+                address, access_type, processing_state, address_space
+                } => write!(f, "Address Error: {:?} {:?} at {:08x} during {:?} processing", access_type, address_space, address, processing_state),
+            Exception::IllegalInstruction(ir, pc) => write!(f, "Illegal Instruction {:04x} at {:08x}", ir, pc),
             Exception::Trap(num, ea_cyc) => write!(f, "Trap: {:02x} (ea cyc {})", num, ea_cyc),
-            Exception::PrivilegeViolation(ir, pc) => {
-                write!(f, "Privilege Violation {:04x} at {:08x}", ir, pc)
-            }
-            Exception::UnimplementedInstruction(ir, pc, _) => {
-                write!(f, "Unimplemented Instruction {:04x} at {:08x}", ir, pc)
-            }
-            Exception::Interrupt(irq, vec) => {
-                write!(f, "Interrupt {:1x} (vector {:02x})", irq, vec)
-            }
+            Exception::PrivilegeViolation(ir, pc) => write!(f, "Privilege Violation {:04x} at {:08x}", ir, pc),
+            Exception::UnimplementedInstruction(ir, pc, _) => write!(f, "Unimplemented Instruction {:04x} at {:08x}", ir, pc),
+            Exception::Interrupt(irq, vec) => write!(f, "Interrupt {:1x} (vector {:02x})", irq, vec),
         }
     }
 }
 use std::error;
 impl error::Error for Exception {
     fn description(&self) -> &str {
-        match *self {
-            Exception::AddressError { .. } => "Address Error",
+         match *self {
+            Exception::AddressError{..} => "Address Error",
             Exception::IllegalInstruction(_, _) => "Illegal Instruction",
             Exception::Trap(_, _) => "Trap",
             Exception::PrivilegeViolation(_, _) => "PrivilegeViolation",
             Exception::UnimplementedInstruction(_, _, _) => "UnimplementedInstruction",
             Exception::Interrupt(_, _) => "Interrupt",
-        }
+         }
     }
     fn cause(&self) -> Option<&dyn error::Error> {
         None
@@ -494,70 +471,51 @@ use crate::ram::ADDRBUS_MASK;
 
 // these values are borrowed from Musashi
 // and not yet fully understood
-const SFLAG_SET: u32 = 0x04;
+const SFLAG_SET: u32 =  0x04;
 const XFLAG_SET: u32 = 0x100;
 const ZFLAG_SET: u32 = 0x00;
-const NFLAG_SET: u32 = 0x80;
-const VFLAG_SET: u32 = 0x80;
+const NFLAG_SET: u32 =  0x80;
+const VFLAG_SET: u32 =  0x80;
 const CFLAG_SET: u32 = 0x100;
 const CPU_SR_MASK: u16 = 0xa71f; /* T1 -- S  -- -- I2 I1 I0 -- -- -- X  N  Z  V  C  */
 const CPU_SR_INT_MASK: u32 = 0x0700;
 
-const VFLAG_CLEAR: u32 = 0x00;
-const XFLAG_CLEAR: u32 = 0x00;
-const NFLAG_CLEAR: u32 = 0x00;
-const CFLAG_CLEAR: u32 = 0x00;
-const SFLAG_CLEAR: u32 = 0x00;
-const ZFLAG_CLEAR: u32 = 0xffff_ffff; // used as "non-z-flag"
+const VFLAG_CLEAR: u32 =  0x00;
+const XFLAG_CLEAR: u32 =  0x00;
+const NFLAG_CLEAR: u32 =  0x00;
+const CFLAG_CLEAR: u32 =  0x00;
+const SFLAG_CLEAR: u32 =  0x00;
+const ZFLAG_CLEAR: u32 =  0xffff_ffff; // used as "non-z-flag"
 
 // Exception Vectors
 //pub const EXCEPTION_BUS_ERROR: u8               =  2;
-pub const EXCEPTION_ADDRESS_ERROR: u8 = 3;
-pub const EXCEPTION_ILLEGAL_INSTRUCTION: u8 = 4;
-pub const EXCEPTION_ZERO_DIVIDE: u8 = 5;
-pub const EXCEPTION_CHK: u8 = 6;
-pub const EXCEPTION_TRAPV: u8 = 7;
-pub const EXCEPTION_PRIVILEGE_VIOLATION: u8 = 8;
+pub const EXCEPTION_ADDRESS_ERROR: u8           =  3;
+pub const EXCEPTION_ILLEGAL_INSTRUCTION: u8     =  4;
+pub const EXCEPTION_ZERO_DIVIDE: u8             =  5;
+pub const EXCEPTION_CHK: u8                     =  6;
+pub const EXCEPTION_TRAPV: u8                   =  7;
+pub const EXCEPTION_PRIVILEGE_VIOLATION: u8     =  8;
 // pub const EXCEPTION_TRACE: u8                   =  9;
-pub const EXCEPTION_UNIMPLEMENTED_1010: u8 = 10;
-pub const EXCEPTION_UNIMPLEMENTED_1111: u8 = 11;
+pub const EXCEPTION_UNIMPLEMENTED_1010: u8      = 10;
+pub const EXCEPTION_UNIMPLEMENTED_1111: u8      = 11;
 // pub const EXCEPTION_FORMAT_ERROR: u8            = 14;
 // pub const EXCEPTION_UNINITIALIZED_INTERRUPT: u8 = 15;
 // pub const EXCEPTION_SPURIOUS_INTERRUPT: u8      = 24;
 // pub const EXCEPTION_INTERRUPT_AUTOVECTOR: u8    = 24;
-pub const EXCEPTION_TRAP_BASE: u8 = 32;
+pub const EXCEPTION_TRAP_BASE: u8               = 32;
 
 impl TestCore {
     pub fn new(base: u32) -> TestCore {
         TestCore {
-            pc: base,
-            prefetch_addr: 0,
-            prefetch_data: 0,
-            inactive_ssp: 0,
-            inactive_usp: 0,
-            ir: 0,
-            processing_state: ProcessingState::Group0Exception,
-            dar: [0u32; 16],
-            mem: LoggingMem::new(0xaaaa_aaaa, OpsLogger::new()),
-            instruction_set: std::sync::Arc::new(ops::instruction_set()),
-            irq_level: 0,
-            int_ctrl: AutoInterruptController::new(),
-            s_flag: SFLAG_SET,
-            int_mask: CPU_SR_INT_MASK,
-            x_flag: 0,
-            v_flag: 0,
-            c_flag: 0,
-            n_flag: 0,
-            not_z_flag: 0xffff_ffff,
+            pc: base, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: 0, inactive_usp: 0, ir: 0, processing_state: ProcessingState::Group0Exception,
+            dar: [0u32; 16], mem: LoggingMem::new(0xaaaa_aaaa, OpsLogger::new()), instruction_set: std::sync::Arc::new(ops::instruction_set()),
+            irq_level: 0, int_ctrl: AutoInterruptController::new(),
+            s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
             fc_is_data: false,
         }
     }
     pub fn new_auto() -> TestCore {
-        TestCore::new_with(
-            0,
-            AutoInterruptController::new(),
-            LoggingMem::new(0xaaaa_aaaa, OpsLogger::new()),
-        )
+        TestCore::new_with(0, AutoInterruptController::new(), LoggingMem::new(0xaaaa_aaaa, OpsLogger::new()))
     }
     pub fn new_mem(base: u32, contents: &[u8]) -> TestCore {
         TestCore::new_mem_init(base, contents, 0xaaaa_aaaa)
@@ -568,25 +526,10 @@ impl TestCore {
             lm.write_u8(base + offset as u32, u32::from(*byte));
         }
         TestCore {
-            pc: base,
-            prefetch_addr: 0,
-            prefetch_data: 0,
-            inactive_ssp: 0,
-            inactive_usp: 0,
-            ir: 0,
-            processing_state: ProcessingState::Normal,
-            dar: [0u32; 16],
-            mem: lm,
-            instruction_set: std::sync::Arc::new(ops::instruction_set()),
-            irq_level: 0,
-            int_ctrl: AutoInterruptController::new(),
-            s_flag: SFLAG_SET,
-            int_mask: CPU_SR_INT_MASK,
-            x_flag: 0,
-            v_flag: 0,
-            c_flag: 0,
-            n_flag: 0,
-            not_z_flag: 0xffff_ffff,
+            pc: base, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: 0, inactive_usp: 0, ir: 0, processing_state: ProcessingState::Normal,
+            dar: [0u32; 16], mem: lm, instruction_set: std::sync::Arc::new(ops::instruction_set()),
+            irq_level: 0, int_ctrl: AutoInterruptController::new(),
+            s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
             fc_is_data: false,
         }
     }
@@ -597,25 +540,10 @@ impl TestCore {
             lm.write_u8(base + offset as u32, u32::from(*byte));
         }
         TestCore {
-            pc: base,
-            prefetch_addr: 0,
-            prefetch_data: 0,
-            inactive_ssp: 0,
-            inactive_usp: 0,
-            ir: 0,
-            processing_state: ProcessingState::Normal,
-            dar: [0u32; 16],
-            mem: lm,
-            instruction_set: (*ops::INSTRUCTION_SET_TEST).clone(),
-            irq_level: 0,
-            int_ctrl: AutoInterruptController::new(),
-            s_flag: SFLAG_SET,
-            int_mask: CPU_SR_INT_MASK,
-            x_flag: 0,
-            v_flag: 0,
-            c_flag: 0,
-            n_flag: 0,
-            not_z_flag: 0xffff_ffff,
+            pc: base, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: 0, inactive_usp: 0, ir: 0, processing_state: ProcessingState::Normal,
+            dar: [0u32; 16], mem: lm, instruction_set: (*ops::INSTRUCTION_SET_TEST).clone(),
+            irq_level: 0, int_ctrl: AutoInterruptController::new(),
+            s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
             fc_is_data: false,
         }
     }
@@ -648,25 +576,10 @@ impl TestCore {
 impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     pub fn new_with(base: u32, int_ctrl: T, memory: A) -> ConfiguredCore<T, A> {
         ConfiguredCore {
-            pc: base,
-            prefetch_addr: 0,
-            prefetch_data: 0,
-            inactive_ssp: 0,
-            inactive_usp: 0,
-            ir: 0,
-            processing_state: ProcessingState::Group0Exception,
-            dar: [0u32; 16],
-            mem: memory,
-            instruction_set: std::sync::Arc::new(ops::instruction_set()),
-            irq_level: 0,
-            int_ctrl,
-            s_flag: SFLAG_SET,
-            int_mask: CPU_SR_INT_MASK,
-            x_flag: 0,
-            v_flag: 0,
-            c_flag: 0,
-            n_flag: 0,
-            not_z_flag: 0xffff_ffff,
+            pc: base, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: 0, inactive_usp: 0, ir: 0, processing_state: ProcessingState::Group0Exception,
+            dar: [0u32; 16], mem: memory, instruction_set: std::sync::Arc::new(ops::instruction_set()),
+            irq_level: 0, int_ctrl,
+            s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
             fc_is_data: false,
         }
     }
@@ -683,19 +596,19 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         self.processing_state = ProcessingState::Normal;
     }
     pub fn x_flag_as_1(&self) -> u32 {
-        (self.x_flag >> 8) & 1
+        (self.x_flag>>8)&1
     }
     // admittely I've chosen to reuse Musashi's representation of flags
     // which I don't fully understand (they are not matching their
     // positions in the SR/CCR)
     pub fn status_register(&self) -> u16 {
-        ((self.s_flag << 11)
-            | self.int_mask
-            | ((self.x_flag & XFLAG_SET) >> 4)
-            | ((self.n_flag & NFLAG_SET) >> 4)
-            | ((not1!(self.not_z_flag)) << 2)
-            | ((self.v_flag & VFLAG_SET) >> 6)
-            | ((self.c_flag & CFLAG_SET) >> 8)) as u16
+        ((self.s_flag << 11)                |
+        self.int_mask                        |
+        ((self.x_flag & XFLAG_SET) >> 4)    |
+        ((self.n_flag & NFLAG_SET) >> 4)    |
+        ((not1!(self.not_z_flag))  << 2)    |
+        ((self.v_flag & VFLAG_SET) >> 6)    |
+        ((self.c_flag & CFLAG_SET) >> 8)) as u16
     }
     pub fn condition_code_register(&self) -> u16 {
         self.status_register() & 0xff
@@ -721,12 +634,12 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         let sr = u32::from(sr & CPU_SR_MASK);
         let old_sflag = self.s_flag;
         self.int_mask = sr & CPU_SR_INT_MASK;
-        self.s_flag = (sr >> 11) & SFLAG_SET;
-        self.x_flag = (sr << 4) & XFLAG_SET;
-        self.n_flag = (sr << 4) & NFLAG_SET;
+        self.s_flag =           (sr >> 11) & SFLAG_SET;
+        self.x_flag =            (sr <<  4) & XFLAG_SET;
+        self.n_flag =            (sr <<  4) & NFLAG_SET;
         self.not_z_flag = not1!(sr & 0b00100);
-        self.v_flag = (sr << 6) & VFLAG_SET;
-        self.c_flag = (sr << 8) & CFLAG_SET;
+        self.v_flag =            (sr <<  6) & VFLAG_SET;
+        self.c_flag =            (sr <<  8) & CFLAG_SET;
         if old_sflag != self.s_flag {
             if self.s_flag == SFLAG_SET {
                 self.inactive_usp = self.dar[15];
@@ -748,94 +661,72 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         let supervisor = (sr >> 13) & 1;
         let irq_mask = (0x700 & sr) >> 8;
 
-        format!(
-            "-{}{}{}{}{}{}{}",
-            if supervisor > 0 { 'S' } else { 'U' },
-            irq_mask,
-            if 0 < (sr >> 4) & 1 { 'X' } else { '-' },
-            if 0 < (sr >> 3) & 1 { 'N' } else { '-' },
-            if 0 < (sr >> 2) & 1 { 'Z' } else { '-' },
-            if 0 < (sr >> 1) & 1 { 'V' } else { '-' },
-            if 0 < (sr) & 1 { 'C' } else { '-' }
-        )
+        format!("-{}{}{}{}{}{}{}",
+        if supervisor > 0 {'S'} else {'U'},
+        irq_mask,
+        if 0 < (sr >> 4) & 1 {'X'} else {'-'},
+        if 0 < (sr >> 3) & 1 {'N'} else {'-'},
+        if 0 < (sr >> 2) & 1 {'Z'} else {'-'},
+        if 0 < (sr >> 1) & 1 {'V'} else {'-'},
+        if 0 < (sr     ) & 1 {'C'} else {'-'})
     }
     pub fn read_imm_u32(&mut self) -> Result<u32> {
         self.set_fc(false);
         let address_space = AddressSpace::from_flags(self.s_flag != 0, self.fc_is_data);
         if self.pc & 1 > 0 {
-            return Err(Exception::AddressError {
-                address: self.pc,
-                access_type: AccessType::Read,
-                address_space,
-                processing_state: self.processing_state,
-            });
+            return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
         let mut temp_val = 0u32;
         if self.pc != self.prefetch_addr {
             self.prefetch_addr = self.pc;
-            self.prefetch_data = self
-                .read_program_word(self.prefetch_addr & ADDRBUS_MASK)
-                .unwrap();
+            self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
         }
         temp_val = self.prefetch_data & 0xffff;
         self.pc += 2;
         self.prefetch_addr = self.pc;
-        self.prefetch_data = self
-            .read_program_word(self.prefetch_addr & ADDRBUS_MASK)
-            .unwrap();
+        self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
 
         temp_val = (temp_val << 16) | (self.prefetch_data & 0xffff);
         self.pc += 2;
         self.prefetch_addr = self.pc;
-        self.prefetch_data = self
-            .read_program_word(self.prefetch_addr & ADDRBUS_MASK)
-            .unwrap();
+        self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
 
         Ok(temp_val)
     }
     pub fn read_imm_i16(&mut self) -> Result<i16> {
         match self.read_imm_u16() {
             Ok(value) => Ok(value as i16),
-            Err(e) => Err(e),
+            Err(e) => Err(e)
         }
     }
     pub fn read_imm_u16(&mut self) -> Result<u16> {
         self.set_fc(false);
         let address_space = AddressSpace::from_flags(self.s_flag != 0, self.fc_is_data);
         if self.pc & 1 > 0 {
-            return Err(Exception::AddressError {
-                address: self.pc,
-                access_type: AccessType::Read,
-                address_space,
-                processing_state: self.processing_state,
-            });
+            return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
         let mut result = 0u32;
         if self.pc != self.prefetch_addr {
             self.prefetch_addr = self.pc;
-            self.prefetch_data = self
-                .read_program_word(self.prefetch_addr & ADDRBUS_MASK)
-                .unwrap();
+            self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
         }
         result = self.prefetch_data & 0xffff;
         self.pc += 2;
         self.prefetch_addr = self.pc;
-        self.prefetch_data = self
-            .read_program_word(self.prefetch_addr & ADDRBUS_MASK)
-            .unwrap();
+        self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
         Ok(result as u16)
     }
     pub fn push_sp(&mut self) -> u32 {
-        let new_sp = (Wrapping(self.dar[15]) - Wrapping(4)).0;
-        self.dar[15] = new_sp;
-        self.write_long(new_sp, new_sp).unwrap();
-        new_sp
+         let new_sp = (Wrapping(self.dar[15]) - Wrapping(4)).0;
+         self.dar[15] = new_sp;
+         self.write_long(new_sp, new_sp).unwrap();
+         new_sp
     }
     pub fn push_32(&mut self, value: u32) -> u32 {
-        let new_sp = (Wrapping(self.dar[15]) - Wrapping(4)).0;
-        self.dar[15] = new_sp;
-        self.write_long(new_sp, value).unwrap();
-        new_sp
+         let new_sp = (Wrapping(self.dar[15]) - Wrapping(4)).0;
+         self.dar[15] = new_sp;
+         self.write_long(new_sp, value).unwrap();
+         new_sp
     }
     pub fn pop_32(&mut self) -> u32 {
         let sp = self.dar[15];
@@ -844,10 +735,10 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         data
     }
     pub fn push_16(&mut self, value: u16) -> u32 {
-        let new_sp = (Wrapping(self.dar[15]) - Wrapping(2)).0;
-        self.dar[15] = new_sp;
-        self.write_word(new_sp, u32::from(value)).unwrap();
-        new_sp
+         let new_sp = (Wrapping(self.dar[15]) - Wrapping(2)).0;
+         self.dar[15] = new_sp;
+         self.write_word(new_sp, u32::from(value)).unwrap();
+         new_sp
     }
     pub fn pop_16(&mut self) -> u16 {
         let sp = self.dar[15];
@@ -857,96 +748,49 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     }
     pub fn read_data_byte(&mut self, address: u32) -> Result<u32> {
         self.set_fc(true);
-        let address_space = if self.s_flag != 0 {
-            SUPERVISOR_DATA
-        } else {
-            USER_DATA
-        };
+        let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         Ok(self.mem.read_byte(address_space, address))
     }
     pub fn read_program_byte(&mut self, address: u32) -> Result<u32> {
         self.set_fc(false);
-        let address_space = if self.s_flag != 0 {
-            SUPERVISOR_PROGRAM
-        } else {
-            USER_PROGRAM
-        };
+        let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         Ok(self.mem.read_byte(address_space, address))
     }
     pub fn write_data_byte(&mut self, address: u32, value: u32) -> Result<()> {
         self.set_fc(true);
-        self.mem.write_byte(
-            if self.s_flag != 0 {
-                SUPERVISOR_DATA
-            } else {
-                USER_DATA
-            },
-            address,
-            value,
-        );
+        self.mem.write_byte(if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA}, address, value);
         Ok(())
     }
     pub fn write_program_byte(&mut self, address: u32, value: u32) -> Result<()> {
         self.set_fc(false);
-        let address_space = if self.s_flag != 0 {
-            SUPERVISOR_PROGRAM
-        } else {
-            USER_PROGRAM
-        };
+        let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         self.mem.write_byte(address_space, address, value);
         Ok(())
     }
     pub fn read_data_word(&mut self, address: u32) -> Result<u32> {
         self.set_fc(true);
-        let address_space = if self.s_flag != 0 {
-            SUPERVISOR_DATA
-        } else {
-            USER_DATA
-        };
+        let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
-            Err(Exception::AddressError {
-                address,
-                access_type: AccessType::Read,
-                address_space,
-                processing_state: self.processing_state,
-            })
+            Err(Exception::AddressError{address, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         } else {
             Ok(self.mem.read_word(address_space, address))
         }
     }
     pub fn read_program_word(&mut self, address: u32) -> Result<u32> {
         self.set_fc(false);
-        let address_space = if self.s_flag != 0 {
-            SUPERVISOR_PROGRAM
-        } else {
-            USER_PROGRAM
-        };
+        let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
             // println!("{}", std::backtrace::Backtrace::force_capture());
-            Err(Exception::AddressError {
-                address,
-                access_type: AccessType::Read,
-                address_space,
-                processing_state: self.processing_state,
-            })
+            Err(Exception::AddressError {address, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         } else {
             Ok(self.mem.read_word(address_space, address))
         }
     }
     pub fn write_data_word(&mut self, address: u32, value: u32) -> Result<()> {
         self.set_fc(true);
-        let address_space = if self.s_flag != 0 {
-            SUPERVISOR_DATA
-        } else {
-            USER_DATA
-        };
+        let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
-            Err(Exception::AddressError {
-                address,
-                access_type: AccessType::Write,
-                address_space,
-                processing_state: self.processing_state,
-            })
+            Err(Exception::AddressError{address, access_type: AccessType::Write, address_space, processing_state: self.processing_state})
         } else {
             self.mem.write_word(address_space, address, value);
             Ok(())
@@ -954,18 +798,9 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     }
     pub fn write_program_word(&mut self, address: u32, value: u32) -> Result<()> {
         self.set_fc(false);
-        let address_space = if self.s_flag != 0 {
-            SUPERVISOR_PROGRAM
-        } else {
-            USER_PROGRAM
-        };
+        let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
-            Err(Exception::AddressError {
-                address,
-                access_type: AccessType::Write,
-                address_space,
-                processing_state: self.processing_state,
-            })
+            Err(Exception::AddressError{address, access_type: AccessType::Write, address_space, processing_state: self.processing_state})
         } else {
             self.mem.write_word(address_space, address, value);
             Ok(())
@@ -973,54 +808,27 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     }
     pub fn read_data_long(&mut self, address: u32) -> Result<u32> {
         self.set_fc(true);
-        let address_space = if self.s_flag != 0 {
-            SUPERVISOR_DATA
-        } else {
-            USER_DATA
-        };
+        let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
-            Err(Exception::AddressError {
-                address,
-                access_type: AccessType::Read,
-                address_space,
-                processing_state: self.processing_state,
-            })
+            Err(Exception::AddressError{address, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         } else {
             Ok(self.mem.read_long(address_space, address))
         }
     }
     pub fn read_program_long(&mut self, address: u32) -> Result<u32> {
         self.set_fc(false);
-        let address_space = if self.s_flag != 0 {
-            SUPERVISOR_PROGRAM
-        } else {
-            USER_PROGRAM
-        };
+        let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
-            Err(Exception::AddressError {
-                address,
-                access_type: AccessType::Read,
-                address_space,
-                processing_state: self.processing_state,
-            })
+            Err(Exception::AddressError{address, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         } else {
             Ok(self.mem.read_long(address_space, address))
         }
     }
     pub fn write_data_long(&mut self, address: u32, value: u32) -> Result<()> {
         self.set_fc(true);
-        let address_space = if self.s_flag != 0 {
-            SUPERVISOR_DATA
-        } else {
-            USER_DATA
-        };
+        let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
-            Err(Exception::AddressError {
-                address,
-                access_type: AccessType::Write,
-                address_space,
-                processing_state: self.processing_state,
-            })
+            Err(Exception::AddressError{address, access_type: AccessType::Write, address_space, processing_state: self.processing_state})
         } else {
             self.mem.write_long(address_space, address, value);
             Ok(())
@@ -1028,18 +836,9 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     }
     pub fn write_program_long(&mut self, address: u32, value: u32) -> Result<()> {
         self.set_fc(false);
-        let address_space = if self.s_flag != 0 {
-            SUPERVISOR_PROGRAM
-        } else {
-            USER_PROGRAM
-        };
+        let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
-            Err(Exception::AddressError {
-                address,
-                access_type: AccessType::Write,
-                address_space,
-                processing_state: self.processing_state,
-            })
+            Err(Exception::AddressError{address, access_type: AccessType::Write, address_space, processing_state: self.processing_state})
         } else {
             self.mem.write_long(address_space, address, value);
             Ok(())
@@ -1063,13 +862,8 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         self.s_flag = SFLAG_SET;
         backup_sr
     }
-    pub fn handle_address_error(
-        &mut self,
-        bad_address: u32,
-        access_type: AccessType,
-        processing_state: ProcessingState,
-        address_space: AddressSpace,
-    ) -> Cycles {
+    pub fn handle_address_error(&mut self, bad_address: u32, access_type: AccessType, processing_state: ProcessingState, address_space: AddressSpace) -> Cycles
+    {
         if processing_state == ProcessingState::Group0Exception {
             self.processing_state = ProcessingState::Halted;
             return Cycles(0);
@@ -1082,20 +876,15 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         self.push_32(pc);
         self.push_16(backup_sr);
         self.push_16(ir);
-        self.push_32(bad_address); /* access address */
+        self.push_32(bad_address);    /* access address */
         /* 0 0 0 0 0 0 0 0 0 0 0 R/W I/N FC
          * R/W  0 = write, 1 = read
          * I/N  0 = instruction, 1 = not
          * FC   3-bit function code
          */
-        let access_info = match access_type {
-            AccessType::Read => 0b10000,
-            _ => 0,
-        } | if processing_state.instruction_processing() {
-            0
-        } else {
-            0b01000
-        } | (address_space.fc() as u16);
+        let access_info = match access_type {AccessType::Read => 0b10000, _ => 0 } |
+            if processing_state.instruction_processing() { 0 } else { 0b01000 } |
+            (address_space.fc() as u16);
         self.push_16(access_info);
         self.jump_vector(EXCEPTION_ADDRESS_ERROR);
         Cycles(50)
@@ -1113,33 +902,17 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         self.handle_exception(ProcessingState::Group2Exception, pc, vector, 34)
     }
     pub fn handle_illegal_instruction(&mut self, pc: u32) -> Cycles {
-        self.handle_exception(
-            ProcessingState::Group1Exception,
-            pc,
-            EXCEPTION_ILLEGAL_INSTRUCTION,
-            34,
-        )
+        self.handle_exception(ProcessingState::Group1Exception, pc, EXCEPTION_ILLEGAL_INSTRUCTION, 34)
     }
     pub fn handle_privilege_violation(&mut self, pc: u32) -> Cycles {
-        self.handle_exception(
-            ProcessingState::Group1Exception,
-            pc,
-            EXCEPTION_PRIVILEGE_VIOLATION,
-            34,
-        )
+        self.handle_exception(ProcessingState::Group1Exception, pc, EXCEPTION_PRIVILEGE_VIOLATION, 34)
     }
     pub fn handle_trap(&mut self, trap: u8, cycles: i32) -> Cycles {
         let pc = self.pc;
         self.handle_exception(ProcessingState::Group2Exception, pc, trap, cycles)
     }
 
-    pub fn handle_exception(
-        &mut self,
-        new_state: ProcessingState,
-        pc: u32,
-        vector: u8,
-        cycles: i32,
-    ) -> Cycles {
+    pub fn handle_exception(&mut self, new_state: ProcessingState, pc: u32, vector: u8, cycles: i32) -> Cycles {
         self.processing_state = new_state;
         let backup_sr = self.ensure_supervisor_mode();
 
@@ -1190,10 +963,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
     pub fn read_instruction(&mut self) -> Result<u16> {
         // first check for interrupts
         if let Some(irq) = self.pending_interrupt() {
-            let vector = self
-                .int_ctrl
-                .acknowledge_interrupt(irq)
-                .unwrap_or(SPURIOUS_INTERRUPT);
+            let vector = self.int_ctrl.acknowledge_interrupt(irq).unwrap_or(SPURIOUS_INTERRUPT);
             Err(Exception::Interrupt(irq, vector))
         } else {
             // not interrupted, read instruction from PC
@@ -1212,53 +982,38 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         while remaining_cycles.any() && self.can_execute() {
             // Read an instruction from PC (increments PC by 2)
             let result = self.read_instruction().and_then(|opcode| {
-                self.ir = opcode;
-                // Call instruction handler to mutate Core accordingly
-                self.instruction_set[opcode as usize](self)
-            });
+                    self.ir = opcode;
+                    // Call instruction handler to mutate Core accordingly
+                    self.instruction_set[opcode as usize](self)
+                });
             self.set_fc(true);
-            remaining_cycles = remaining_cycles
-                - match result {
-                    Ok(cycles_used) => cycles_used,
-                    Err(ex) => match state.exception_callback(self, ex) {
+            remaining_cycles = remaining_cycles - match result {
+                Ok(cycles_used) => cycles_used,
+                Err(ex) => {
+                    match state.exception_callback(self, ex) {
                         Ok(cycles_used) => cycles_used,
-                        Err(Exception::AddressError {
-                            address,
-                            access_type,
-                            processing_state,
-                            address_space,
-                        }) => self.handle_address_error(
-                            address,
-                            access_type,
-                            processing_state,
-                            address_space,
-                        ),
-                        Err(Exception::IllegalInstruction(_, pc)) => {
-                            self.handle_illegal_instruction(pc)
-                        }
-                        Err(Exception::UnimplementedInstruction(_, pc, vector)) => {
-                            self.handle_unimplemented_instruction(pc, vector)
-                        }
-                        Err(Exception::Trap(num, ea_calculation_cycles)) => {
-                            self.handle_trap(num, ea_calculation_cycles)
-                        }
-                        Err(Exception::PrivilegeViolation(_, pc)) => {
-                            self.handle_privilege_violation(pc)
-                        }
-                        Err(Exception::Interrupt(irq, vec)) => self.handle_interrupt(irq, vec),
-                    },
-                };
+                        Err(Exception::AddressError { address, access_type, processing_state, address_space }) =>
+                            self.handle_address_error(address, access_type, processing_state, address_space),
+                        Err(Exception::IllegalInstruction(_, pc)) =>
+                            self.handle_illegal_instruction(pc),
+                        Err(Exception::UnimplementedInstruction(_, pc, vector)) =>
+                            self.handle_unimplemented_instruction(pc, vector),
+                        Err(Exception::Trap(num, ea_calculation_cycles)) =>
+                            self.handle_trap(num, ea_calculation_cycles),
+                        Err(Exception::PrivilegeViolation(_, pc)) =>
+                            self.handle_privilege_violation(pc),
+                        Err(Exception::Interrupt(irq, vec)) =>
+                            self.handle_interrupt(irq, vec),
+                    }
+                }
+            };
         }
         if self.processing_state.running() {
             cycles - remaining_cycles
         } else {
             // if not running, consume all available cycles
             // including overconsumed cycles
-            let adjust = if remaining_cycles.0 < 0 {
-                remaining_cycles
-            } else {
-                Cycles(0)
-            };
+            let adjust = if remaining_cycles.0 < 0 { remaining_cycles } else { Cycles(0) };
             cycles - adjust
         }
     }
@@ -1270,25 +1025,10 @@ impl Clone for TestCore {
         lm.copy_from(&self.mem);
         assert_eq!(0, lm.logger.len());
         TestCore {
-            pc: self.pc,
-            prefetch_addr: 0,
-            prefetch_data: 0,
-            inactive_ssp: self.inactive_ssp,
-            inactive_usp: self.inactive_usp,
-            ir: self.ir,
-            processing_state: self.processing_state,
-            dar: self.dar,
-            mem: lm,
-            instruction_set: self.instruction_set.clone(),
-            irq_level: 0,
-            int_ctrl: AutoInterruptController::new(),
-            s_flag: self.s_flag,
-            int_mask: self.int_mask,
-            x_flag: self.x_flag,
-            v_flag: self.v_flag,
-            c_flag: self.c_flag,
-            n_flag: self.n_flag,
-            not_z_flag: self.not_z_flag,
+            pc: self.pc, prefetch_addr: 0, prefetch_data: 0, inactive_ssp: self.inactive_ssp, inactive_usp: self.inactive_usp, ir: self.ir, processing_state: self.processing_state,
+            dar: self.dar, mem: lm, instruction_set: self.instruction_set.clone(),
+            irq_level: 0, int_ctrl: AutoInterruptController::new(),
+            s_flag: self.s_flag, int_mask: self.int_mask, x_flag: self.x_flag, v_flag: self.v_flag, c_flag: self.c_flag, n_flag: self.n_flag, not_z_flag: self.not_z_flag,
             fc_is_data: false,
         }
     }
@@ -1296,11 +1036,12 @@ impl Clone for TestCore {
 
 #[cfg(test)]
 mod tests {
+    use super::{TestCore, Cycles};
     use super::ops; //::instruction_set;
-    use super::{Cycles, TestCore};
-    use cpu::ops::opcodes;
+    use ram::{AddressBus, SUPERVISOR_PROGRAM, USER_PROGRAM, USER_DATA};
     use ram::loggingmem::Operation;
-    use ram::{AddressBus, SUPERVISOR_PROGRAM, USER_DATA, USER_PROGRAM};
+    use cpu::ops::opcodes;
+    
 
     #[test]
     fn new_sets_pc() {
@@ -1330,7 +1071,7 @@ mod tests {
         let base = 128;
         let mut cpu = TestCore::new(base);
         cpu.read_imm_u32();
-        assert_eq!(base + 4, cpu.pc);
+        assert_eq!(base+4, cpu.pc);
     }
 
     #[test]
@@ -1338,8 +1079,9 @@ mod tests {
         let base = 128;
         let mut cpu = TestCore::new_mem(base, &[2u8, 1u8, 3u8, 4u8]);
         let val = cpu.read_imm_u32().unwrap();
-        assert_eq!((2 << 24) + (1 << 16) + (3 << 8) + 4, val);
+        assert_eq!((2<<24)+(1<<16)+(3<<8)+4, val);
     }
+
 
     #[test]
     #[allow(unused_must_use)]
@@ -1347,7 +1089,7 @@ mod tests {
         let base = 128;
         let mut cpu = TestCore::new(base);
         cpu.read_imm_u16();
-        assert_eq!(base + 2, cpu.pc);
+        assert_eq!(base+2, cpu.pc);
     }
 
     #[test]
@@ -1357,15 +1099,9 @@ mod tests {
         assert_eq!("-S7-----", cpu.flags());
 
         let val = cpu.read_imm_u16().unwrap();
-        assert_eq!((2 << 8) + (1 << 0), val);
-        assert_eq!(
-            Operation::ReadWord(SUPERVISOR_PROGRAM, base, 0x0201),
-            cpu.mem.logger.ops()[0]
-        );
-        assert_eq!(
-            Operation::ReadWord(SUPERVISOR_PROGRAM, base + 2, 0x0304),
-            cpu.mem.logger.ops()[1]
-        );
+        assert_eq!((2<<8)+(1<<0), val);
+        assert_eq!(Operation::ReadWord(SUPERVISOR_PROGRAM, base, 0x0201), cpu.mem.logger.ops()[0]);
+        assert_eq!(Operation::ReadWord(SUPERVISOR_PROGRAM, base + 2, 0x0304), cpu.mem.logger.ops()[1]);
     }
 
     #[test]
@@ -1376,37 +1112,25 @@ mod tests {
         assert_eq!("-U7-----", cpu.flags());
 
         let val = cpu.read_imm_u16().unwrap();
-        assert_eq!((2 << 8) + (1 << 0), val);
-        assert_eq!(
-            Operation::ReadWord(USER_PROGRAM, base, 0x0201),
-            cpu.mem.logger.ops()[0]
-        );
-        assert_eq!(
-            Operation::ReadWord(USER_PROGRAM, base + 2, 0x0304),
-            cpu.mem.logger.ops()[1]
-        );
+        assert_eq!((2<<8)+(1<<0), val);
+        assert_eq!(Operation::ReadWord(USER_PROGRAM, base, 0x0201), cpu.mem.logger.ops()[0]);
+        assert_eq!(Operation::ReadWord(USER_PROGRAM, base + 2, 0x0304), cpu.mem.logger.ops()[1]);
     }
 
     #[test]
     fn a_reset_reads_sp_and_pc_from_0() {
-        let mut cpu = TestCore::new_mem(0, &[0u8, 0u8, 1u8, 0u8, 0u8, 0u8, 0u8, 128u8]);
+        let mut cpu = TestCore::new_mem(0, &[0u8,0u8,1u8,0u8, 0u8,0u8,0u8,128u8]);
         cpu.reset();
         assert_eq!(256, cpu.dar[15]);
         assert_eq!(128, cpu.pc);
         assert_eq!("-S7-----", cpu.flags());
-        assert_eq!(
-            Operation::ReadWord(SUPERVISOR_PROGRAM, 0, 0),
-            cpu.mem.logger.ops()[0]
-        );
-        assert_eq!(
-            Operation::ReadWord(SUPERVISOR_PROGRAM, 2, 0x100),
-            cpu.mem.logger.ops()[1]
-        );
+        assert_eq!(Operation::ReadWord(SUPERVISOR_PROGRAM, 0, 0), cpu.mem.logger.ops()[0]);
+        assert_eq!(Operation::ReadWord(SUPERVISOR_PROGRAM, 2, 0x100), cpu.mem.logger.ops()[1]);
     }
 
     #[test]
     fn execute_reads_from_pc_and_does_not_panic_on_illegal_instruction() {
-        let mut cpu = TestCore::new_mem(0xba, &[0xba, 0xd1, 1u8, 0u8, 0u8, 0u8, 0u8, 128u8]);
+        let mut cpu = TestCore::new_mem(0xba, &[0xba,0xd1,1u8,0u8, 0u8,0u8,0u8,128u8]);
         cpu.execute1();
     }
     #[test]
@@ -1417,7 +1141,7 @@ mod tests {
 
     #[test]
     fn execute_can_execute_instruction_handler_0a() {
-        let mut cpu = TestCore::new_mem(0xba, &[0x00, 0x0A, 1u8, 0u8, 0u8, 0u8, 0u8, 128u8]);
+        let mut cpu = TestCore::new_mem(0xba, &[0x00, 0x0A, 1u8,0u8, 0u8,0u8,0u8,128u8]);
         cpu.instruction_set = std::sync::Arc::new(ops::fake::instruction_set());
         cpu.execute1();
         assert_eq!(0xabcd, cpu.dar[0]);
@@ -1426,12 +1150,13 @@ mod tests {
 
     #[test]
     fn execute_can_execute_instruction_handler_0b() {
-        let mut cpu = TestCore::new_mem(0xba, &[0x00, 0x0B, 1u8, 0u8, 0u8, 0u8, 0u8, 128u8]);
+        let mut cpu = TestCore::new_mem(0xba, &[0x00, 0x0B, 1u8,0u8, 0u8,0u8,0u8,128u8]);
         cpu.instruction_set = std::sync::Arc::new(ops::fake::instruction_set());
         cpu.execute1();
         assert_eq!(0x0000, cpu.dar[0]);
         assert_eq!(0xbcde, cpu.dar[1]);
     }
+
 
     #[test]
     fn execute_can_execute_set_dx() {
@@ -1472,7 +1197,7 @@ mod tests {
         // 0xc308 = abcd_8_mm taking 18 cycles
         let mut cpu = TestCore::new_mem(0x40, &[0xc3, 0x08, 0xc3, 0x08]);
         let Cycles(count) = cpu.execute(20);
-        assert_eq!(18 * 2, count);
+        assert_eq!(18*2, count);
     }
 
     #[test]
@@ -1498,8 +1223,8 @@ mod tests {
         // so c308 means A1 = A0 + A1 in BCD
         let mut cpu = TestCore::new_mem(0x40, &[0xc3, 0x08]);
 
-        cpu.dar[8 + 0] = 0x160 + 1;
-        cpu.dar[8 + 1] = 0x260 + 1;
+        cpu.dar[8+0] = 0x160+1;
+        cpu.dar[8+1] = 0x260+1;
         cpu.mem.write_byte(USER_DATA, 0x160, 0x16);
         cpu.mem.write_byte(USER_DATA, 0x260, 0x26);
         cpu.execute1();
@@ -1535,14 +1260,14 @@ mod tests {
         // opcodes d218 is ADD.B    (A0)+, D1
         let mut cpu = TestCore::new_mem(0x40, &[0xd2, 0x18]);
         let addr = 0x100;
-        cpu.dar[8 + 0] = addr;
+        cpu.dar[8+0] = addr;
         cpu.mem.write_byte(USER_DATA, addr, 16);
         cpu.dar[1] = 26;
         cpu.execute1();
 
         // 16 + 26 is 42
         assert_eq!(42, cpu.dar[1]);
-        assert_eq!(addr + 1, cpu.dar[8 + 0]);
+        assert_eq!(addr+1, cpu.dar[8+0]);
     }
 
     #[test]
@@ -1554,14 +1279,14 @@ mod tests {
         // opcodes d220 is ADD.B    -(A0), D1
         let mut cpu = TestCore::new_mem(0x40, &[0xd2, 0x20]);
         let addr = 0x100;
-        cpu.dar[8 + 0] = addr;
-        cpu.mem.write_byte(USER_DATA, addr - 1, 16);
+        cpu.dar[8+0] = addr;
+        cpu.mem.write_byte(USER_DATA, addr-1, 16);
         cpu.dar[1] = 26;
         cpu.execute1();
 
         // 16 + 26 is 42
         assert_eq!(42, cpu.dar[1]);
-        assert_eq!(addr - 1, cpu.dar[8 + 0]);
+        assert_eq!(addr-1, cpu.dar[8+0]);
     }
 
     #[test]
@@ -1574,14 +1299,14 @@ mod tests {
         let mut cpu = TestCore::new_mem(0x40, &[0xd2, 0x10]);
 
         let addr = 0x100;
-        cpu.dar[8 + 0] = addr;
+        cpu.dar[8+0] = addr;
         cpu.mem.write_byte(USER_DATA, addr, 16);
         cpu.dar[1] = 26;
         cpu.execute1();
 
         // 16 + 26 is 42
         assert_eq!(42, cpu.dar[1]);
-        assert_eq!(addr, cpu.dar[8 + 0]);
+        assert_eq!(addr, cpu.dar[8+0]);
     }
     #[test]
     fn add_8_er_di_with_positive_displacement() {
@@ -1593,7 +1318,7 @@ mod tests {
         let mut cpu = TestCore::new_mem(0x40, &[0xd2, 0x28, 0x01, 0x08]);
 
         let addr = 0x100;
-        cpu.dar[8 + 0] = addr;
+        cpu.dar[8+0] = addr;
         let displaced_addr = addr + 0x108;
         cpu.mem.write_byte(USER_DATA, displaced_addr, 16);
         cpu.dar[1] = 26;
@@ -1601,7 +1326,7 @@ mod tests {
 
         // 16 + 26 is 42
         assert_eq!(42, cpu.dar[1]);
-        assert_eq!(addr, cpu.dar[8 + 0]);
+        assert_eq!(addr, cpu.dar[8+0]);
     }
     #[test]
     fn add_8_er_di_with_negative_displacement() {
@@ -1613,7 +1338,7 @@ mod tests {
         let mut cpu = TestCore::new_mem(0x40, &[0xd2, 0x28, 0xFF, 0xFE]);
 
         let addr = 0x100;
-        cpu.dar[8 + 0] = addr;
+        cpu.dar[8+0] = addr;
         let displaced_addr = addr - 2;
         cpu.mem.write_byte(USER_DATA, displaced_addr, 16);
         cpu.dar[1] = 26;
@@ -1621,7 +1346,7 @@ mod tests {
 
         // 16 + 26 is 42
         assert_eq!(42, cpu.dar[1]);
-        assert_eq!(addr, cpu.dar[8 + 0]);
+        assert_eq!(addr, cpu.dar[8+0]);
     }
     #[test]
     fn add_8_er_ix_with_positive_displacement() {
@@ -1635,8 +1360,8 @@ mod tests {
         let addr = 0x100;
         let index = 0x10;
         let displacement = 2;
-        cpu.dar[8 + 0] = addr;
-        cpu.dar[8 + 1] = index;
+        cpu.dar[8+0] = addr;
+        cpu.dar[8+1] = index;
         let effective_addr = addr + index + displacement;
         cpu.mem.write_byte(USER_DATA, effective_addr, 16);
         cpu.dar[1] = 26;
@@ -1644,7 +1369,7 @@ mod tests {
 
         // 16 + 26 is 42
         assert_eq!(42, cpu.dar[1]);
-        assert_eq!(addr, cpu.dar[8 + 0]);
+        assert_eq!(addr, cpu.dar[8+0]);
     }
     #[test]
     fn add_8_er_ix_with_negative_displacement() {
@@ -1658,8 +1383,8 @@ mod tests {
         let addr = 0x100;
         let index = 0x10;
         let displacement = 2;
-        cpu.dar[8 + 0] = addr;
-        cpu.dar[8 + 1] = index;
+        cpu.dar[8+0] = addr;
+        cpu.dar[8+1] = index;
         let effective_addr = addr + index - displacement;
         cpu.mem.write_byte(USER_DATA, effective_addr, 16);
         cpu.dar[1] = 26;
@@ -1667,7 +1392,7 @@ mod tests {
 
         // 16 + 26 is 42
         assert_eq!(42, cpu.dar[1]);
-        assert_eq!(addr, cpu.dar[8 + 0]);
+        assert_eq!(addr, cpu.dar[8+0]);
     }
     #[test]
     fn add_8_er_aw() {
@@ -1711,7 +1436,7 @@ mod tests {
         // where [02468ace] is DX (dest regno)
         // opcodes d23a,0108 is ADD.B    ($0108, PC), D1
         let mut cpu = TestCore::new_mem(0x40, &[0xd2, 0x3a, 0x01, 0x08]);
-        let addr = 0x40 + 2 + 0x0108;
+        let addr = 0x40+2+0x0108;
         cpu.mem.write_byte(USER_DATA, addr, 16);
         cpu.dar[1] = 26;
         cpu.execute1();
@@ -1730,7 +1455,7 @@ mod tests {
         let addr = cpu.pc + 2; // will be +2 after reading instruction word
         let index = 0x10;
         let displacement = 2;
-        cpu.dar[8 + 1] = index;
+        cpu.dar[8+1] = index;
         let effective_addr = addr + index + displacement;
         cpu.mem.write_byte(USER_DATA, effective_addr, 16);
         cpu.dar[1] = 26;
@@ -1755,10 +1480,9 @@ mod tests {
         assert_eq!(42, cpu.dar[1]);
     }
     #[test]
-    fn add_16_re_pi() {
-        //0xD400, 0xD700
+    fn add_16_re_pi() { //0xD400, 0xD700
         let mut cpu = TestCore::new_mem(0x40, &[0xd3, 0x58]);
-        cpu.dar[8 + 0] = 0x40;
+        cpu.dar[8+0] = 0x40;
         cpu.dar[1] = 0xa8;
 
         cpu.execute1();
@@ -1776,23 +1500,23 @@ mod tests {
     }
 
     #[test]
-    fn status_register_roundtrip() {
+    fn status_register_roundtrip(){
         let mut core = TestCore::new(0x40);
         //Status register bits are:
         //      TTSM_0iii_000X_NZVC;
-        let f = 0b0000_1000_1110_0000; // these bits should always be zero
-        let s = 0b0010_0000_0000_0000;
-        let i = 0b0000_0111_0000_0000;
-        let x = 0b0000_0000_0001_0000;
-        let n = 0b0000_0000_0000_1000;
-        let z = 0b0000_0000_0000_0100;
-        let v = 0b0000_0000_0000_0010;
-        let c = 0b0000_0000_0000_0001;
-        let flags = vec![x, n, z, v, c, f, s, i, 0];
+        let f=0b0000_1000_1110_0000; // these bits should always be zero
+        let s=0b0010_0000_0000_0000;
+        let i=0b0000_0111_0000_0000;
+        let x=0b0000_0000_0001_0000;
+        let n=0b0000_0000_0000_1000;
+        let z=0b0000_0000_0000_0100;
+        let v=0b0000_0000_0000_0010;
+        let c=0b0000_0000_0000_0001;
+        let flags = vec![x,n,z,v,c,f,s,i,0];
         for sf in flags {
             core.sr_to_flags(sf);
             let sr = core.status_register();
-            let expected = if sf == f { 0 } else { sf };
+            let expected = if sf == f {0} else {sf};
             assert_eq!(expected, sr);
         }
     }
@@ -1811,8 +1535,7 @@ mod tests {
     #[test]
     fn user_mode_chk_16_pd_with_trap_uses_sp_correctly() {
         let mut cpu = TestCore::new_mem(0x40, &[0x41, 0xa7]); // 0x41a7 CHK.W -(A7), D0
-        cpu.write_data_long(super::EXCEPTION_CHK as u32 * 4, 0x1010)
-            .unwrap(); // set up exception vector 6
+        cpu.write_data_long(super::EXCEPTION_CHK as u32 * 4, 0x1010).unwrap(); // set up exception vector 6
         cpu.s_flag = super::SFLAG_CLEAR; // user mode
         cpu.inactive_ssp = 0x200; // Supervisor stack at 0x200
         cpu.dar[15] = 0x100; // User stack at 0x100
@@ -1821,8 +1544,8 @@ mod tests {
         cpu.execute1();
         assert_eq!(0x1010, cpu.pc);
         assert_eq!(super::SFLAG_SET, cpu.s_flag);
-        assert_eq!(0x100 - 2, cpu.inactive_usp); // check USP, decremented by A7 PD
-        assert_eq!(0x200 - 6, cpu.dar[15]); // check SSP
+        assert_eq!(0x100-2, cpu.inactive_usp); // check USP, decremented by A7 PD
+        assert_eq!(0x200-6, cpu.dar[15]); // check SSP
     }
 
     #[test]
@@ -1856,8 +1579,7 @@ mod tests {
     #[test]
     fn core_can_stop() {
         let initial_pc = 0x40;
-        let mut cpu =
-            TestCore::new_mem_init(initial_pc, &[0x4e, 0x72, 0x00, 0x00], opcodes::OP_NOP);
+        let mut cpu = TestCore::new_mem_init(initial_pc, &[0x4e, 0x72, 0x00, 0x00], opcodes::OP_NOP);
         cpu.sr_to_flags(0xffff); // Supa mode
         cpu.execute1();
         assert_eq!(0x0000, cpu.status_register());
@@ -1884,8 +1606,7 @@ mod tests {
     #[test]
     fn processing_state_is_known_in_g2_exception_handler() {
         let mut cpu = TestCore::new_mem(0x40, &[0x41, 0x90]); // 0x4190 CHK.W (A0), D0
-        cpu.write_data_long(super::EXCEPTION_CHK as u32 * 4, 0x1010)
-            .unwrap(); // set up exception vector 6
+        cpu.write_data_long(super::EXCEPTION_CHK as u32 * 4, 0x1010).unwrap(); // set up exception vector 6
         cpu.write_data_word(0x1010, opcodes::OP_RTE_32).unwrap(); // handler is just RTE
         cpu.s_flag = super::SFLAG_CLEAR; // user mode
         cpu.inactive_ssp = 0x200; // Supervisor stack at 0x200
@@ -1895,14 +1616,11 @@ mod tests {
         cpu.execute1();
         assert_eq!(0x1010, cpu.pc);
         assert_eq!(super::SFLAG_SET, cpu.s_flag);
-        assert_eq!(
-            super::ProcessingState::Group2Exception,
-            cpu.processing_state
-        );
-        assert_eq!(0x200 - 6, cpu.dar[15]); // check SSP
+        assert_eq!(super::ProcessingState::Group2Exception, cpu.processing_state);
+        assert_eq!(0x200-6, cpu.dar[15]); // check SSP
 
         cpu.execute1(); // will execute RTE
-                        // which should return to user mode, instruction after CHK, normal state
+        // which should return to user mode, instruction after CHK, normal state
         assert_eq!(0x42, cpu.pc);
         assert_eq!(super::SFLAG_CLEAR, cpu.s_flag);
         assert_eq!(super::ProcessingState::Normal, cpu.processing_state);
@@ -1912,8 +1630,7 @@ mod tests {
     fn processing_state_is_known_in_g1_exception_handler() {
         // real illegal instruction = 0x4afc, but any illegal instruction should work
         let mut cpu = TestCore::new_mem(0x40, &[0x4a, 0xfc]);
-        cpu.write_data_long(super::EXCEPTION_ILLEGAL_INSTRUCTION as u32 * 4, 0x1010)
-            .unwrap(); // set up exception vector
+        cpu.write_data_long(super::EXCEPTION_ILLEGAL_INSTRUCTION as u32 * 4, 0x1010).unwrap(); // set up exception vector
         cpu.write_data_word(0x1010, opcodes::OP_RTE_32).unwrap(); // handler is just RTE
         cpu.s_flag = super::SFLAG_CLEAR; // user mode
         cpu.inactive_ssp = 0x200; // Supervisor stack at 0x200
@@ -1922,13 +1639,10 @@ mod tests {
         cpu.execute1(); // will execute the illegal instruction and enter the handler in supervisor mode
         assert_eq!(0x1010, cpu.pc);
         assert_eq!(super::SFLAG_SET, cpu.s_flag);
-        assert_eq!(
-            super::ProcessingState::Group1Exception,
-            cpu.processing_state
-        );
+        assert_eq!(super::ProcessingState::Group1Exception, cpu.processing_state);
 
         cpu.execute1(); // will execute RTE
-                        // which should return to user mode, faulting instruction, normal state
+        // which should return to user mode, faulting instruction, normal state
         assert_eq!(0x40, cpu.pc);
         assert_eq!(super::SFLAG_CLEAR, cpu.s_flag);
         assert_eq!(super::ProcessingState::Normal, cpu.processing_state);
@@ -1937,8 +1651,7 @@ mod tests {
     #[test]
     fn processing_state_is_known_in_g0_exception_handler() {
         let mut cpu = TestCore::new_mem(0x40, &[0x41, 0xa0]); // 0x41a0 CHK.W -(A0), D0
-        cpu.write_data_long(super::EXCEPTION_ADDRESS_ERROR as u32 * 4, 0x1010)
-            .unwrap(); // set up exception vector
+        cpu.write_data_long(super::EXCEPTION_ADDRESS_ERROR as u32 * 4, 0x1010).unwrap(); // set up exception vector
         cpu.write_data_word(0x1010, 0x504F).unwrap(); // handler is ADD #8, A7
         cpu.write_data_word(0x1012, opcodes::OP_RTE_32).unwrap(); // followed by RTE
 
@@ -1949,19 +1662,16 @@ mod tests {
 
         cpu.execute1();
         assert_eq!(0x1010, cpu.pc);
-        assert_eq!(0x200 - 14, cpu.dar[15]);
+        assert_eq!(0x200-14, cpu.dar[15]);
         assert_eq!(super::SFLAG_SET, cpu.s_flag);
-        assert_eq!(
-            super::ProcessingState::Group0Exception,
-            cpu.processing_state
-        );
+        assert_eq!(super::ProcessingState::Group0Exception, cpu.processing_state);
 
         cpu.execute1(); // will execute ADD #8, A7 (to skip g0 stuff in stack frame)
         assert_eq!(0x1012, cpu.pc);
-        assert_eq!(0x200 - 6, cpu.dar[15]);
+        assert_eq!(0x200-6, cpu.dar[15]);
 
         cpu.execute1(); // will execute RTE
-                        // which should return to user mode, after faulted instruction, normal state
+        // which should return to user mode, after faulted instruction, normal state
         assert_eq!(0x42, cpu.pc); // this is what address errors stack in Musashi
         assert_eq!(super::SFLAG_CLEAR, cpu.s_flag);
         assert_eq!(super::ProcessingState::Normal, cpu.processing_state);
@@ -1983,19 +1693,14 @@ mod tests {
         let vec4handler = 0x2F0000;
         let autovector_base = 24;
         let irq = 5;
-        cpu.mem
-            .write_long(SUPERVISOR_PROGRAM, (autovector_base + irq) * 4, vec4handler);
+        cpu.mem.write_long(SUPERVISOR_PROGRAM, (autovector_base + irq) * 4 , vec4handler);
         // opcodes d278,0108 is ADD.W    $0108, D1
-        cpu.mem
-            .write_long(SUPERVISOR_PROGRAM, vec4handler, 0xd2780108);
+        cpu.mem.write_long(SUPERVISOR_PROGRAM, vec4handler, 0xd2780108);
         cpu.execute1(); // will execute STOP
         assert_eq!(super::ProcessingState::Stopped, cpu.processing_state);
         cpu.int_ctrl.request_interrupt(irq as u8);
         cpu.execute1(); // will trigger interrupt handler
-        assert_eq!(
-            super::ProcessingState::Group1Exception,
-            cpu.processing_state
-        );
+        assert_eq!(super::ProcessingState::Group1Exception, cpu.processing_state);
         assert_eq!(vec4handler, cpu.pc);
         cpu.execute1(); // should execute first instruction of handler, which is 4 bytes
         assert_eq!(vec4handler + 4, cpu.pc);
@@ -2022,19 +1727,12 @@ mod tests {
         // (except external reset) occurs in a group 0 exception handler
         let mut cpu = TestCore::new_mem(0x41, &[0xd2, 0x00]); // d200 is ADD.B D0, D1
         let address_error_handler = 0x2F0001;
-        cpu.mem.write_long(
-            SUPERVISOR_PROGRAM,
-            super::EXCEPTION_ADDRESS_ERROR as u32 * 4,
-            address_error_handler,
-        );
+        cpu.mem.write_long(SUPERVISOR_PROGRAM, super::EXCEPTION_ADDRESS_ERROR as u32 * 4, address_error_handler);
         // opcodes d278,0108 is ADD.W    $0108, D1
         cpu.execute1(); // will execute at an odd address, invoking the address error exception handler
-        assert_eq!(
-            super::ProcessingState::Group0Exception,
-            cpu.processing_state
-        );
+        assert_eq!(super::ProcessingState::Group0Exception, cpu.processing_state);
         cpu.execute1(); // will execute the handler at an odd address,
-                        // this should trigger a second address error, which should halt the processor
+        // this should trigger a second address error, which should halt the processor
         assert_eq!(super::ProcessingState::Halted, cpu.processing_state);
         // in the halted state, the only way to win, is not to play.
         // An external reset is needed.
@@ -2051,12 +1749,13 @@ mod tests {
         assert_eq!(super::ProcessingState::Halted, cpu.processing_state);
     }
 
-    use cpu::{Callbacks, Core, Exception, Result};
+    use cpu::{Result, Callbacks, Exception, Core};
 
-    struct CustomExceptionHandler {
+    struct CustomExceptionHandler
+    {
         suppress: bool,
         count: isize,
-        ex: Option<Exception>,
+        ex: Option<Exception>
     }
 
     impl Callbacks for CustomExceptionHandler {
@@ -2083,17 +1782,9 @@ mod tests {
         let address_error_handler = 0x2F0000;
         // setup an odd PC, in order to cause an Address Error
         let mut cpu = TestCore::new_mem(odd_initial_address, &[0xd2, 0x00]); // d200 is ADD.B D0, D1
-        cpu.write_data_long(
-            super::EXCEPTION_ADDRESS_ERROR as u32 * 4,
-            address_error_handler,
-        )
-        .unwrap();
+        cpu.write_data_long(super::EXCEPTION_ADDRESS_ERROR as u32 * 4, address_error_handler).unwrap();
 
-        let mut handler = CustomExceptionHandler {
-            suppress: false,
-            count: 0,
-            ex: None,
-        };
+        let mut handler = CustomExceptionHandler { suppress: false, count: 0, ex: None };
         let cycles = cpu.execute_with_state(1, &mut handler);
         assert_eq!(1, handler.count);
         assert_eq!(Cycles(50), cycles); // expected number of cycles for initiating an AddressError exception
