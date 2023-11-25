@@ -5,6 +5,9 @@ use std::{env, path::Path};
 const NEW_CONF: &str = include_str!("m68kconf.h");
 
 fn main() {
+    if !cfg!(test) {
+        return;
+    }
     let cargo_manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
     let manifest_path = Path::new(&cargo_manifest_dir);
     let manifest_path_parent = manifest_path.parent().unwrap();
@@ -19,7 +22,7 @@ fn main() {
             Err(_) => panic!("unable to back up conf file!"),
         }
     } else if !m68kconf_file.exists() {
-        match fs::write(m68kconf_file, NEW_CONF) {
+        match fs::write(m68kconf_file.clone(), NEW_CONF) {
             Ok(_) => {}
             Err(_) => panic!("unable to replace conf file!"),
         }
@@ -104,5 +107,5 @@ fn main() {
         let _ = fs::remove_file(musashi_dir.join(Path::new("m68kmake")));
         let _ = fs::remove_file(musashi_dir.join(Path::new("m68kmake.o")));
     }
-    println!("cargo:rerun-if-changed={}", musashi_dir.to_str().unwrap());
+    println!("cargo:rerun-if-changed={}", m68kconf_file.to_str().unwrap());
 }
