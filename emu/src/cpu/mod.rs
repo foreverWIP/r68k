@@ -677,26 +677,19 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
             return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
         let mut temp_val = 0u32;
-        if cfg!(feature = "prefetch") {
-            if self.pc != self.prefetch_addr {
-                self.prefetch_addr = self.pc;
-                self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
-            }
-            temp_val = self.prefetch_data & 0xffff;
-            self.pc += 2;
+        if self.pc != self.prefetch_addr {
             self.prefetch_addr = self.pc;
             self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
-
-            temp_val = (temp_val << 16) | (self.prefetch_data & 0xffff);
-            self.pc += 2;
-            self.prefetch_addr = self.pc;
-            self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
-        } else {
-            temp_val = self.read_program_word(self.pc & ADDRBUS_MASK).unwrap();
-            self.pc += 2;
-            temp_val = (temp_val << 16) | (self.read_program_word(self.pc & ADDRBUS_MASK).unwrap() & 0xffff);
-            self.pc += 2;
         }
+        temp_val = self.prefetch_data & 0xffff;
+        self.pc += 2;
+        self.prefetch_addr = self.pc;
+        self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
+
+        temp_val = (temp_val << 16) | (self.prefetch_data & 0xffff);
+        self.pc += 2;
+        self.prefetch_addr = self.pc;
+        self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
 
         Ok(temp_val)
     }
@@ -713,19 +706,14 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
             return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
         let mut result = 0u32;
-        if cfg!(feature = "prefetch") {
-            if self.pc != self.prefetch_addr {
-                self.prefetch_addr = self.pc;
-                self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
-            }
-            result = self.prefetch_data & 0xffff;
-            self.pc += 2;
+        if self.pc != self.prefetch_addr {
             self.prefetch_addr = self.pc;
             self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
-        } else {
-            result = self.read_program_word(self.pc & ADDRBUS_MASK).unwrap();
-            self.pc += 2;
         }
+        result = self.prefetch_data & 0xffff;
+        self.pc += 2;
+        self.prefetch_addr = self.pc;
+        self.prefetch_data = self.read_program_word(self.prefetch_addr & ADDRBUS_MASK).unwrap();
         Ok(result as u16)
     }
     pub fn push_sp(&mut self) -> u32 {
