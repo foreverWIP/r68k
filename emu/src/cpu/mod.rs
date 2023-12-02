@@ -354,11 +354,13 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
 }
 pub const STACK_POINTER_REG: usize = 15;
 
+#[cfg(feature = "cycles")]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Cycles(pub i32);
 
 use std::ops::Sub;
 use std::ops::Add;
+#[cfg(feature = "cycles")]
 impl Sub for Cycles {
     type Output = Cycles;
 
@@ -366,6 +368,7 @@ impl Sub for Cycles {
         Cycles(self.0 - _rhs.0)
     }
 }
+#[cfg(feature = "cycles")]
 impl Add for Cycles {
     type Output = Cycles;
 
@@ -373,11 +376,18 @@ impl Add for Cycles {
         Cycles(self.0 + _rhs.0)
     }
 }
+#[cfg(feature = "cycles")]
 impl Cycles {
     fn any(self) -> bool {
         self.0 > 0
     }
 }
+
+#[cfg(not(feature = "cycles"))]
+pub fn Cycles(_c: i32) {}
+
+#[cfg(not(feature = "cycles"))]
+pub type Cycles = ();
 
 pub trait Callbacks {
     fn exception_callback(&mut self, core: &mut impl Core, ex: Exception) -> Result<Cycles>;
@@ -989,44 +999,81 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         self.execute_with_state(cycles, &mut EmulateAllExceptions)
     }
     pub fn execute_with_state<S: Callbacks>(&mut self, cycles: i32, state: &mut S) -> Cycles {
+        #[cfg(feature = "cycles")]
         let cycles = Cycles(cycles);
         let mut remaining_cycles = cycles;
-        while remaining_cycles.any() && self.can_execute() {
-            // Read an instruction from PC (increments PC by 2)
-            let result = self.read_instruction().and_then(|opcode| {
-                    self.ir = opcode;
-                    // Call instruction handler to mutate Core accordingly
-                    self.instruction_set[opcode as usize](self)
-                });
-            self.set_fc(true);
-            remaining_cycles = remaining_cycles - match result {
-                Ok(cycles_used) => cycles_used,
-                Err(ex) => {
-                    match state.exception_callback(self, ex) {
-                        Ok(cycles_used) => cycles_used,
-                        Err(Exception::AddressError { address, access_type, processing_state, address_space }) =>
-                            self.handle_address_error(address, access_type, processing_state, address_space),
-                        Err(Exception::IllegalInstruction(_, pc)) =>
-                            self.handle_illegal_instruction(pc),
-                        Err(Exception::UnimplementedInstruction(_, pc, vector)) =>
-                            self.handle_unimplemented_instruction(pc, vector),
-                        Err(Exception::Trap(num, ea_calculation_cycles)) =>
-                            self.handle_trap(num, ea_calculation_cycles),
-                        Err(Exception::PrivilegeViolation(_, pc)) =>
-                            self.handle_privilege_violation(pc),
-                        Err(Exception::Interrupt(irq, vec)) =>
-                            self.handle_interrupt(irq, vec),
+        #[cfg(feature = "cycles")]
+        {
+            while remaining_cycles.any() && self.can_execute() {
+                // Read an instruction from PC (increments PC by 2)
+                let result = self.read_instruction().and_then(|opcode| {
+                        self.ir = opcode;
+                        // Call instruction handler to mutate Core accordingly
+                        self.instruction_set[opcode as usize](self)
+                    });
+                self.set_fc(true);
+                remaining_cycles = remaining_cycles - match result {
+                    Ok(cycles_used) => cycles_used,
+                    Err(ex) => {
+                        match state.exception_callback(self, ex) {
+                            Ok(cycles_used) => cycles_used,
+                            Err(Exception::AddressError { address, access_type, processing_state, address_space }) =>
+                                self.handle_address_error(address, access_type, processing_state, address_space),
+                            Err(Exception::IllegalInstruction(_, pc)) =>
+                                self.handle_illegal_instruction(pc),
+                            Err(Exception::UnimplementedInstruction(_, pc, vector)) =>
+                                self.handle_unimplemented_instruction(pc, vector),
+                            Err(Exception::Trap(num, ea_calculation_cycles)) =>
+                                self.handle_trap(num, ea_calculation_cycles),
+                            Err(Exception::PrivilegeViolation(_, pc)) =>
+                                self.handle_privilege_violation(pc),
+                            Err(Exception::Interrupt(irq, vec)) =>
+                                self.handle_interrupt(irq, vec),
+                        }
                     }
-                }
-            };
+                };
+            }
+            if self.processing_state.running() {
+                cycles - remaining_cycles
+            } else {
+                // if not running, consume all available cycles
+                // including overconsumed cycles
+                let adjust = if remaining_cycles.0 < 0 { remaining_cycles } else { Cycles(0) };
+                cycles - adjust
+            }
         }
-        if self.processing_state.running() {
-            cycles - remaining_cycles
-        } else {
-            // if not running, consume all available cycles
-            // including overconsumed cycles
-            let adjust = if remaining_cycles.0 < 0 { remaining_cycles } else { Cycles(0) };
-            cycles - adjust
+        #[cfg(not(feature = "cycles"))]
+        {
+            while remaining_cycles > 0 && self.can_execute() {
+                // Read an instruction from PC (increments PC by 2)
+                let result = self.read_instruction().and_then(|opcode| {
+                        self.ir = opcode;
+                        // Call instruction handler to mutate Core accordingly
+                        self.instruction_set[opcode as usize](self)
+                    });
+                self.set_fc(true);
+                match result {
+                    Ok(_) => {},
+                    Err(ex) => {
+                        match state.exception_callback(self, ex) {
+                            Ok(_) => {},
+                            Err(Exception::AddressError { address, access_type, processing_state, address_space }) =>
+                                self.handle_address_error(address, access_type, processing_state, address_space),
+                            Err(Exception::IllegalInstruction(_, pc)) =>
+                                self.handle_illegal_instruction(pc),
+                            Err(Exception::UnimplementedInstruction(_, pc, vector)) =>
+                                self.handle_unimplemented_instruction(pc, vector),
+                            Err(Exception::Trap(num, ea_calculation_cycles)) =>
+                                self.handle_trap(num, ea_calculation_cycles),
+                            Err(Exception::PrivilegeViolation(_, pc)) =>
+                                self.handle_privilege_violation(pc),
+                            Err(Exception::Interrupt(irq, vec)) =>
+                                self.handle_interrupt(irq, vec),
+                        }
+                    }
+                };
+                remaining_cycles -= 1;
+            }
         }
     }
 }
@@ -1197,6 +1244,7 @@ mod tests {
         assert_eq!(200, *elem);
         // assert_eq!(200, &mut marr[1]);
     }
+    #[cfg(feature = "cycles")]
     #[test]
     fn cycle_counting() {
         // 0xc308 = abcd_8_mm taking 18 cycles
@@ -1204,6 +1252,7 @@ mod tests {
         let Cycles(count) = cpu.execute1();
         assert_eq!(18, count);
     }
+    #[cfg(feature = "cycles")]
     #[test]
     fn cycle_counting_exec2() {
         // 0xc308 = abcd_8_mm taking 18 cycles
@@ -1588,6 +1637,7 @@ mod tests {
         assert_eq!(super::SFLAG_SET, cpu.s_flag);
     }
 
+    #[cfg(feature = "cycles")]
     #[test]
     fn core_can_stop() {
         let initial_pc = 0x40;
