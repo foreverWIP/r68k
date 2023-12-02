@@ -44,7 +44,9 @@ pub trait Core {
     fn write_program_byte(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_program_word(&mut self, address: u32, value: u32) -> Result<()>;
     fn write_program_long(&mut self, address: u32, value: u32) -> Result<()>;
+    #[cfg(feature = "fc")]
     fn is_fc_data(&self) -> bool;
+    #[cfg(feature = "fc")]
     fn set_fc(&mut self, is_data: bool);
     fn status_register(&self) -> u16;
     fn condition_code_register(&self) -> u16;
@@ -105,6 +107,7 @@ pub struct ConfiguredCore<T: InterruptController, A: AddressBus> {
     pub not_z_flag: u32,
     pub processing_state: ProcessingState,
     pub mem: A,
+    #[cfg(feature = "fc")]
     fc_is_data: bool,
 }
 impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
@@ -155,25 +158,31 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
         self.x_flag_as_1()
     }
     fn read_byte(&mut self, address: u32) -> Result<u32> {
+        #[cfg(feature = "fc")]
         if self.fc_is_data {
             self.read_data_byte(address)
         } else {
             self.read_program_byte(address)
         }
+        self.read_program_byte(address)
     }
     fn read_word(&mut self, address: u32) -> Result<u32> {
+        #[cfg(feature = "fc")]
         if self.fc_is_data {
             self.read_data_word(address)
         } else {
             self.read_program_word(address)
         }
+        self.read_program_word(address)
     }
     fn read_long(&mut self, address: u32) -> Result<u32> {
+        #[cfg(feature = "fc")]
         if self.fc_is_data {
             self.read_data_long(address)
         } else {
             self.read_program_long(address)
         }
+        self.read_program_long(address)
     }
     fn read_data_byte(&mut self, address: u32) -> Result<u32> {
         self.read_data_byte(address)
@@ -220,9 +229,11 @@ impl<T: InterruptController, A: AddressBus> Core for ConfiguredCore<T, A> {
     fn write_program_long(&mut self, address: u32, value: u32) -> Result<()> {
         self.write_program_long(address, value)
     }
+    #[cfg(feature = "fc")]
     fn is_fc_data(&self) -> bool {
         self.fc_is_data
     }
+    #[cfg(feature = "fc")]
     fn set_fc(&mut self, is_data: bool) {
         self.fc_is_data = is_data;
     }
@@ -521,6 +532,7 @@ impl TestCore {
             dar: [0u32; 16], mem: LoggingMem::new(0xaaaa_aaaa, OpsLogger::new()), instruction_set: std::sync::Arc::new(ops::instruction_set()),
             irq_level: 0, int_ctrl: AutoInterruptController::new(),
             s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
+            #[cfg(feature = "fc")]
             fc_is_data: false,
         }
     }
@@ -540,6 +552,7 @@ impl TestCore {
             dar: [0u32; 16], mem: lm, instruction_set: std::sync::Arc::new(ops::instruction_set()),
             irq_level: 0, int_ctrl: AutoInterruptController::new(),
             s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
+            #[cfg(feature = "fc")]
             fc_is_data: false,
         }
     }
@@ -554,6 +567,7 @@ impl TestCore {
             dar: [0u32; 16], mem: lm, instruction_set: (*ops::INSTRUCTION_SET_TEST).clone(),
             irq_level: 0, int_ctrl: AutoInterruptController::new(),
             s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
+            #[cfg(feature = "fc")]
             fc_is_data: false,
         }
     }
@@ -579,7 +593,10 @@ impl TestCore {
         self.c_flag = 0;
         self.n_flag = 0;
         self.not_z_flag = 0xffff_ffff;
-        self.fc_is_data = false;
+        #[cfg(feature = "fc")]
+        {
+            self.fc_is_data = false;
+        }
     }
 }
 
@@ -590,6 +607,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
             dar: [0u32; 16], mem: memory, instruction_set: std::sync::Arc::new(ops::instruction_set()),
             irq_level: 0, int_ctrl,
             s_flag: SFLAG_SET, int_mask: CPU_SR_INT_MASK, x_flag: 0, v_flag: 0, c_flag: 0, n_flag: 0, not_z_flag: 0xffff_ffff,
+            #[cfg(feature = "fc")]
             fc_is_data: false,
         }
     }
@@ -681,8 +699,12 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         if 0 < (sr     ) & 1 {'C'} else {'-'})
     }
     pub fn read_imm_u32(&mut self) -> Result<u32> {
+        #[cfg(feature = "fc")]
         self.set_fc(false);
+        #[cfg(feature = "fc")]
         let address_space = AddressSpace::from_flags(self.s_flag != 0, self.fc_is_data);
+        #[cfg(not(feature = "fc"))]
+        let address_space = AddressSpace::from_flags(self.s_flag != 0, false);
         if self.pc & 1 > 0 {
             return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
@@ -717,8 +739,12 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn read_imm_u16(&mut self) -> Result<u16> {
+        #[cfg(feature = "fc")]
         self.set_fc(false);
+        #[cfg(feature = "fc")]
         let address_space = AddressSpace::from_flags(self.s_flag != 0, self.fc_is_data);
+        #[cfg(not(feature = "fc"))]
+        let address_space = AddressSpace::from_flags(self.s_flag != 0, false);
         if self.pc & 1 > 0 {
             return Err(Exception::AddressError{address: self.pc, access_type: AccessType::Read, address_space, processing_state: self.processing_state})
         }
@@ -769,27 +795,32 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         data
     }
     pub fn read_data_byte(&mut self, address: u32) -> Result<u32> {
+        #[cfg(feature = "fc")]
         self.set_fc(true);
         let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         Ok(self.mem.read_byte(address_space, address))
     }
     pub fn read_program_byte(&mut self, address: u32) -> Result<u32> {
+        #[cfg(feature = "fc")]
         self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         Ok(self.mem.read_byte(address_space, address))
     }
     pub fn write_data_byte(&mut self, address: u32, value: u32) -> Result<()> {
+        #[cfg(feature = "fc")]
         self.set_fc(true);
         self.mem.write_byte(if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA}, address, value);
         Ok(())
     }
     pub fn write_program_byte(&mut self, address: u32, value: u32) -> Result<()> {
+        #[cfg(feature = "fc")]
         self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         self.mem.write_byte(address_space, address, value);
         Ok(())
     }
     pub fn read_data_word(&mut self, address: u32) -> Result<u32> {
+        #[cfg(feature = "fc")]
         self.set_fc(true);
         let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
@@ -799,6 +830,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn read_program_word(&mut self, address: u32) -> Result<u32> {
+        #[cfg(feature = "fc")]
         self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
@@ -809,6 +841,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn write_data_word(&mut self, address: u32, value: u32) -> Result<()> {
+        #[cfg(feature = "fc")]
         self.set_fc(true);
         let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
@@ -819,6 +852,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn write_program_word(&mut self, address: u32, value: u32) -> Result<()> {
+        #[cfg(feature = "fc")]
         self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
@@ -829,6 +863,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn read_data_long(&mut self, address: u32) -> Result<u32> {
+        #[cfg(feature = "fc")]
         self.set_fc(true);
         let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
@@ -838,6 +873,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn read_program_long(&mut self, address: u32) -> Result<u32> {
+        #[cfg(feature = "fc")]
         self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
@@ -847,6 +883,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn write_data_long(&mut self, address: u32, value: u32) -> Result<()> {
+        #[cfg(feature = "fc")]
         self.set_fc(true);
         let address_space = if self.s_flag != 0 {SUPERVISOR_DATA} else {USER_DATA};
         if address & 1 > 0 {
@@ -857,6 +894,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
         }
     }
     pub fn write_program_long(&mut self, address: u32, value: u32) -> Result<()> {
+        #[cfg(feature = "fc")]
         self.set_fc(false);
         let address_space = if self.s_flag != 0 {SUPERVISOR_PROGRAM} else {USER_PROGRAM};
         if address & 1 > 0 {
@@ -1011,6 +1049,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
                         // Call instruction handler to mutate Core accordingly
                         self.instruction_set[opcode as usize](self)
                     });
+                #[cfg(feature = "fc")]
                 self.set_fc(true);
                 remaining_cycles = remaining_cycles - match result {
                     Ok(cycles_used) => cycles_used,
@@ -1051,6 +1090,7 @@ impl<T: InterruptController, A: AddressBus> ConfiguredCore<T, A> {
                         // Call instruction handler to mutate Core accordingly
                         self.instruction_set[opcode as usize](self)
                     });
+                #[cfg(feature = "fc")]
                 self.set_fc(true);
                 match result {
                     Ok(_) => {},
@@ -1088,6 +1128,7 @@ impl Clone for TestCore {
             dar: self.dar, mem: lm, instruction_set: self.instruction_set.clone(),
             irq_level: 0, int_ctrl: AutoInterruptController::new(),
             s_flag: self.s_flag, int_mask: self.int_mask, x_flag: self.x_flag, v_flag: self.v_flag, c_flag: self.c_flag, n_flag: self.n_flag, not_z_flag: self.not_z_flag,
+            #[cfg(feature = "fc")]
             fc_is_data: false,
         }
     }

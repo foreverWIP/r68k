@@ -68,11 +68,13 @@ pub fn al_8<T: Core>(core: &mut T) -> Result<u32> {
     .and_then(|ea| core.read_byte(ea))
 }
 pub fn pcdi_8<T: Core>(core: &mut T) -> Result<u32> {
+    #[cfg(feature = "fc")]
     core.set_fc(false);
     effective_address::displacement_pc(core)
     .and_then(|ea| core.read_byte(ea))
 }
 pub fn pcix_8<T: Core>(core: &mut T) -> Result<u32> {
+    #[cfg(feature = "fc")]
     core.set_fc(false);
     effective_address::index_pc(core)
     .and_then(|ea| core.read_byte(ea))
@@ -148,11 +150,13 @@ pub fn al_16<T: Core>(core: &mut T) -> Result<u32> {
     .and_then(|ea| core.read_word(ea))
 }
 pub fn pcdi_16<T: Core>(core: &mut T) -> Result<u32> {
+    #[cfg(feature = "fc")]
     core.set_fc(false);
     effective_address::displacement_pc(core)
     .and_then(|ea| core.read_word(ea))
 }
 pub fn pcix_16<T: Core>(core: &mut T) -> Result<u32> {
+    #[cfg(feature = "fc")]
     core.set_fc(false);
     effective_address::index_pc(core)
     .and_then(|ea| core.read_word(ea))
@@ -228,11 +232,13 @@ pub fn al_32<T: Core>(core: &mut T) -> Result<u32> {
     .and_then(|ea| core.read_long(ea))
 }
 pub fn pcdi_32<T: Core>(core: &mut T) -> Result<u32> {
+    #[cfg(feature = "fc")]
     core.set_fc(false);
     effective_address::displacement_pc(core)
     .and_then(|ea| core.read_long(ea))
 }
 pub fn pcix_32<T: Core>(core: &mut T) -> Result<u32> {
+    #[cfg(feature = "fc")]
     core.set_fc(false);
     effective_address::index_pc(core)
     .and_then(|ea| core.read_long(ea))

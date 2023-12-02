@@ -2059,9 +2059,6 @@ macro_rules! move_frs {
         });
     ($name:ident, $src:ident, $cycles:expr) => (
         pub fn $name<T: Core>(core: &mut T) -> Result<Cycles> {
-  // unsigned int ea = ((m68ki_cpu.dar+8)[m68ki_cpu.ir & 7]);
-  // m68ki_write_16_fc(ea, m68ki_cpu.s_flag | 1, ( m68ki_cpu.t1_flag | m68ki_cpu.t0_flag | (m68ki_cpu.s_flag << 11) | (m68ki_cpu.m_flag << 11) | m68ki_cpu.int_mask | (((m68ki_cpu.x_flag&0x100) >> 4) | ((m68ki_cpu.n_flag&0x80) >> 4) | ((!m68ki_cpu.not_z_flag) << 2) | ((m68ki_cpu.v_flag&0x80) >> 6) | ((m68ki_cpu.c_flag&0x100) >> 8))));
-  // return;
             let sr = core.status_register();
             let ea = effective_address::$src(core)?;
             core.write_word(ea, u32::from(sr))?;
