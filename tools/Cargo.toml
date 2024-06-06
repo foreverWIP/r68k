@@ -15,5 +15,5 @@ r68k-common = { path = "../common" }
 pest = "0.4"
 
 [dev-dependencies]
-itertools = "0.4"
-rand = "0.3"
+itertools = "0.13.0"
+rand = "0.8.5"
