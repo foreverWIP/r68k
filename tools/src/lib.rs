@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 #![recursion_limit = "160"] // 150 was too low in rust 1.15
 use std::result;
-mod operand;
+pub mod operand;
 use operand::Operand;
 extern crate r68k_common;
 use r68k_common::ops::*;
